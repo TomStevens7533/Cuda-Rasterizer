@@ -21,7 +21,6 @@ void InteropGLFrameBuffer::Invalidate()
 		glDeleteTextures(1, &m_DepthAttachment);
 	}
 
-
 	glCreateFramebuffers(1, &m_RendererID);
 	glBindFramebuffer(GL_FRAMEBUFFER, m_RendererID);
 
@@ -57,16 +56,19 @@ void InteropGLFrameBuffer::Invalidate()
 
 void InteropGLFrameBuffer::Bind()
 {
-
+	glBindFramebuffer(GL_FRAMEBUFFER, m_RendererID);
+	glViewport(0, 0, m_FrameBufferSpecifics.Width, m_FrameBufferSpecifics.Height);
 }
 
 void InteropGLFrameBuffer::UnBind()
 {
-
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 void InteropGLFrameBuffer::Resize(uint32_t width, uint32_t height)
 {
-
+	m_FrameBufferSpecifics.Width = width;
+	m_FrameBufferSpecifics.Height = height;
+	Invalidate();
 }
 

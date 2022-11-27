@@ -14,6 +14,8 @@
     <CudaCompile Include="CudaKernel.cu" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="interop.cpp" />
+    <ClCompile Include="InteropFrameBuffer.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="obj.cpp" />
     <ClCompile Include="ObjLoader.cpp" />
@@ -21,6 +23,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CudaKernel.h" />
+    <ClInclude Include="glslutility.h" />
+    <ClInclude Include="interop.h" />
+    <ClInclude Include="InteropFrameBuffer.h" />
     <ClInclude Include="obj.h" />
     <ClInclude Include="ObjLoader.h" />
     <ClInclude Include="Structs.h" />

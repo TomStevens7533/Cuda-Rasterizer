@@ -11,6 +11,8 @@
 #include "utilities.h"
 #include "ext/matrix_clip_space.inl"
 #include "CudaKernel.h"
+#include "InteropFrameBuffer.h"
+#include "glslutility.h"
 
 
 #define FOV_DEG 30
@@ -79,6 +81,7 @@ bool InitFramework();
 void InitCuda();
 void InitBuffers();
 void InitTextures();
+GLuint initShader();
 
 void cleanupCuda();
 void deleteTexture(GLuint* tex);
@@ -94,6 +97,9 @@ void errorCallback(int error, const char* description);
 void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
 
 
+cudaGraphicsResource_t m_cudaGraphicsResource;
+cudaArray* m_cudaArray;
+cudaTextureObject_t m_texture;
 
 
 int main() {
@@ -104,6 +110,8 @@ int main() {
 	mesh = new obj();
 	objLoader* loader = new objLoader(data, mesh);
 	mesh->buildVBOs();
+
+
 	std::cout << "Hello world\n";	
 	if (InitFramework()) {
 		// GLFW main loop
@@ -145,8 +153,6 @@ void mainLoop() {
 		Light.specColor = glm::vec3(1.0f);
 		Light.specExp = 20;
 		Light.ambColor = glm::vec3(0.2f, 0.6f, 0.3f);
-		glfwPollEvents();
-
 		RunCuda();
 
 		glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo);
@@ -157,6 +163,7 @@ void mainLoop() {
 		// VAO, shader program, and texture already bound
 		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, 0);
 		glfwSwapBuffers(window);
+		glfwPollEvents();
 	}
 
 	glfwDestroyWindow(window);
@@ -165,28 +172,13 @@ void mainLoop() {
 void RunCuda() {
 	// Map OpenGL buffer object for writing from CUDA on a single GPU
 	// No data is moved (Win & Linux). When mapped to CUDA, OpenGL should not use this buffer
-	dptr = NULL;
 
-	vbo = mesh->getVBO();
-	vbosize = mesh->getVBOsize();
-
-	cbo = mesh->getCBO();
-	cbosize = mesh->getCBOsize();
-
-	ibo = mesh->getIBO();
-	ibosize = mesh->getIBOsize();
-
-	nbo = mesh->getNBO();
-	nbosize = mesh->getNBOsize();
-
-	cudaGLMapBufferObject((void**)&dptr, pbo);
+	size_t size;
+	cudaGraphicsMapResources(1, &m_cudaGraphicsResource);
+	cudaError_t x = cudaGraphicsResourceGetMappedPointer((void**)&dptr, &size, m_cudaGraphicsResource);
 	cudaRasterizeCore(dptr, glm::vec2(width, height), frame, vbo, vbosize, cbo, cbosize, ibo, ibosize, nbo, nbosize, glmViewTransform, glmProjectionTransform, glmMVtransform, Light, isFlatShading, isMeshView);
-	cudaGLUnmapBufferObject(pbo);
+	cudaGraphicsUnmapResources(1, &m_cudaGraphicsResource);
 
-	vbo = NULL;
-	cbo = NULL;
-	ibo = NULL;
-	nbo = NULL;
 
 	frame++;
 	fpstracker++;
@@ -232,9 +224,30 @@ bool InitFramework()
 	InitCuda();
 	InitBuffers();
 
+	GLuint passthroughProgram;
+	passthroughProgram = initShader();
+
+	glUseProgram(passthroughProgram);
+	glActiveTexture(GL_TEXTURE0);
+
+	//glfwSetScrollCallback(window, scroll_callback);
+
 	return true;
 }
 
+GLuint initShader() {
+	const char* attribLocations[] = { "Position", "Tex" };
+	GLuint program = glslUtility::createDefaultProgram(attribLocations, 2);
+	GLint location;
+
+	glUseProgram(program);
+	if ((location = glGetUniformLocation(program, "u_image")) != -1)
+	{
+		glUniform1i(location, 0);
+	}
+
+	return program;
+}
 void InitCuda() {
 	// Use device with highest Gflops/s
 	cudaGLSetGLDevice(0);
@@ -293,7 +306,10 @@ void InitBuffers() {
 
 	// Allocate data for the buffer. 4-channel 8-bit image
 	glBufferData(GL_PIXEL_UNPACK_BUFFER, size_tex_data, NULL, GL_DYNAMIC_COPY);
-	cudaGLRegisterBufferObject(pbo);
+	glBindBuffer(GL_PIXEL_UNPACK_BUFFER_ARB, 0);
+
+	cudaGraphicsGLRegisterBuffer(&m_cudaGraphicsResource, pbo, cudaGraphicsRegisterFlagsNone);
+
 }
 void InitTextures() {
 	glGenTextures(1, &displayImage);
@@ -302,6 +318,7 @@ void InitTextures() {
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_BGRA,
 		GL_UNSIGNED_BYTE, NULL);
+	//delete?
 }
 
 //Clean

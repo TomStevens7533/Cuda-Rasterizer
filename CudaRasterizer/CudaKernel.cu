@@ -9,6 +9,17 @@
 #include <thrust/count.h>
 #include <thrust/device_ptr.h>
 
+#define checkCudaErrors(call)                                 \
+  do {                                                        \
+    cudaError_t err = call;                                   \
+    if (err != cudaSuccess) {                                 \
+      printf("CUDA error at %s %d: %s\n", __FILE__, __LINE__, \
+             cudaGetErrorString(err));                        \
+      exit(EXIT_FAILURE);                                     \
+    }                                                         \
+  } while (0)
+
+
 glm::vec3* framebuffer;
 fragment* depthbuffer;
 
@@ -78,9 +89,14 @@ void cudaRasterizeCore(uchar4* PBOpos, glm::vec2 resolution, float frame, float*
     sendImageToPBO << <fullBlocksPerGrid, threadsPerBlock >> > (PBOpos, resolution, framebuffer);
 
     cudaDeviceSynchronize();
+
+
+    kernelCleanup();
 }
+
 
 void kernelCleanup() {
-	
-}
+    cudaFree(framebuffer);
+    cudaFree(depthbuffer);
 
+}

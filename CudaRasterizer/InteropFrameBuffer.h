@@ -8,25 +8,22 @@ struct FrameBufferSpecific {
 
 	bool SwapChainTarget = false;
 };
-class OpenGLFrameBuffer 
+class InteropGLFrameBuffer 
 {
 public:
-	OpenGLFrameBuffer(const FrameBufferSpecific& spec);
-	virtual ~OpenGLFrameBuffer();
+	InteropGLFrameBuffer(const FrameBufferSpecific& spec);
+	~InteropGLFrameBuffer();
 	void Invalidate();
 
-	virtual void Bind() override;
-	virtual void UnBind() override;
+	void Bind() ;
+	void UnBind() ;
 
-	virtual inline uint32_t GetColorAttachment() const override { return m_ColorAttached; }
-	virtual inline uint32_t GetDepthAttachment() const override { return m_DepthAttachment; }
+	inline uint32_t GetColorAttachment() const  { return m_ColorAttached; }
+	inline uint32_t GetDepthAttachment() const  { return m_DepthAttachment; }
+	inline uint32_t GetRenderID() const { return m_RendererID; }
 
-
-	virtual inline FrameBufferSpecific& GetSpecification() override { return m_FrameBufferSpecifics; }
-
-
-	virtual void Resize(uint32_t width, uint32_t height) override;
-
+	inline FrameBufferSpecific& GetSpecification()  { return m_FrameBufferSpecifics; }
+	void Resize(uint32_t width, uint32_t height) ;
 private:
 	uint32_t m_RendererID = 0;
 	uint32_t m_ColorAttached = 0, m_DepthAttachment = 0;
