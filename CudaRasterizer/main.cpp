@@ -7,6 +7,7 @@
 #include <cuda_runtime.h>
 #include <cuda_gl_interop.h>
 #include "obj.h"
+#include "ObjLoader.h"
 
 //-------------------------------
 //------------Window-------------
@@ -30,7 +31,7 @@ uchar4* dptr;
 
 GLFWwindow* window;
 
-Obj* mesh;
+obj* mesh;
 
 float* vbo;
 int vbosize;
@@ -57,8 +58,6 @@ void deletePBO(GLuint* pbo);
 //-------GLFW CALLBACKS---------
 //------------------------------
 void mainLoop();
-
-
 void errorCallback(int error, const char* description);
 void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
 
@@ -66,6 +65,13 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
 
 
 int main() {
+
+	//Create obj
+
+	std::string data{"obj/cube.obj"};
+	mesh = new obj();
+	objLoader* loader = new objLoader(data, mesh);
+	mesh->buildVBOs();
 	InitFramework();
 	std::cout << "Hello world\n";	
 }

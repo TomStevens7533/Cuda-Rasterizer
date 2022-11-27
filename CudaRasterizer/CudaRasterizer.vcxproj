@@ -16,9 +16,11 @@
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="obj.cpp" />
+    <ClCompile Include="ObjLoader.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="obj.h" />
+    <ClInclude Include="ObjLoader.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{90B083AF-0F56-4B15-A76C-6891F50AA259}</ProjectGuid>
