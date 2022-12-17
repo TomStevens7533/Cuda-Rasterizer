@@ -88,7 +88,7 @@ void deleteTexture(GLuint* tex);
 void deletePBO(GLuint* pbo);
 
 void mainLoop();
-void RunCuda();
+void RunCuda(std::vector<Triangle>& triangleVector);
 
 //------------------------------
 //-------GLFW CALLBACKS---------
@@ -105,7 +105,6 @@ cudaTextureObject_t m_texture;
 int main() {
 
 	//Create obj
-
 	std::string data{"obj/cube.obj"};
 	mesh = new obj();
 	objLoader* loader = new objLoader(data, mesh);
@@ -147,13 +146,14 @@ void mainLoop() {
 		glmProjectionTransform = glm::perspective((float)45.0f, AR, 1.0f, 50.0f);
 		glmMVtransform = ViewTransform * ModelTransform;
 
-		//construct light
-		Light.position = glm::vec3(7.0f, 2.0f, -10.0f);
-		Light.diffColor = glm::vec3(1.0f);
-		Light.specColor = glm::vec3(1.0f);
-		Light.specExp = 20;
-		Light.ambColor = glm::vec3(0.2f, 0.6f, 0.3f);
-		RunCuda();
+		std::vector<Triangle> triangleVec;
+		Triangle tr;
+		tr.vertices[0] = glm::vec3{ 0.f, 0.5f,-1.f };
+		tr.vertices[1] = glm::vec3{ -.5f, -0.5f,-1.f };
+		tr.vertices[2] = glm::vec3{ 0.5f, -0.5f,-1.f };
+		triangleVec.push_back(tr);
+
+		RunCuda(triangleVec);
 
 		glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo);
 		glBindTexture(GL_TEXTURE_2D, displayImage);
@@ -169,14 +169,14 @@ void mainLoop() {
 	glfwDestroyWindow(window);
 	glfwTerminate();
 }
-void RunCuda() {
+void RunCuda(std::vector<Triangle>& triangleVector) {
 	// Map OpenGL buffer object for writing from CUDA on a single GPU
 	// No data is moved (Win & Linux). When mapped to CUDA, OpenGL should not use this buffer
 
 	size_t size;
 	cudaGraphicsMapResources(1, &m_cudaGraphicsResource);
 	cudaError_t x = cudaGraphicsResourceGetMappedPointer((void**)&dptr, &size, m_cudaGraphicsResource);
-	cudaRasterizeCore(dptr, glm::vec2(width, height), frame, vbo, vbosize, cbo, cbosize, ibo, ibosize, nbo, nbosize, glmViewTransform, glmProjectionTransform, glmMVtransform, Light, isFlatShading, isMeshView);
+	cudaRasterizeCore(dptr, glm::vec2(width, height), frame, triangleVector.data(), triangleVector.size() + 1, glmViewTransform, glmProjectionTransform, glmMVtransform);
 	cudaGraphicsUnmapResources(1, &m_cudaGraphicsResource);
 
 

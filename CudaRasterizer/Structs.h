@@ -1,5 +1,11 @@
 #pragma once
 #include "ext/matrix_transform.hpp"
+
+struct Triangle
+{
+	glm::vec3 vertices[3];
+};
+
 struct cudaMat3 {
 	glm::vec3 x;
 	glm::vec3 y;

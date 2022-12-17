@@ -66,24 +66,48 @@ void render(glm::vec2 resolution, fragment* depthbuffer, glm::vec3* framebuffer)
     int index = x + (y * resolution.x);
 
     if (x <= resolution.x && y <= resolution.y) {
-        framebuffer[index] = glm::vec3{255.f, 0.f, 0.f};
+        framebuffer[index] = depthbuffer[index].color;
     }
 }
-// Wrapper for the __global__ call that sets up the kernel calls and memory management
-void cudaRasterizeCore(uchar4* PBOpos, glm::vec2 resolution, float frame, float* vbo, int vbosize, float* cbo, int cbosize, int* ibo, int ibosize, float* nbo, int nbosize, glm::mat4 glmViewTransform, glm::mat4 glmProjectionTransform, glm::mat4 glmMVtransform, light Light, int isFlatShading, int isMeshView) {
+//How to call only other device fucntions+
+void ConvertToScreenspace(Triangle& tr, glm::vec2 resolution) {
+    for (size_t i = 0; i < 2; i++)
+    {
+        tr.vertices[i][0] = ((tr.vertices[0][0] + 1) * 0.5f) * resolution.x;
+        tr.vertices[i][1] = ((1 - tr.vertices[0][1]) * 0.5f) * resolution.y;
+
+    }
+}
+void cudaRasterizeCore(uchar4* PBOpos, glm::vec2 resolution, float frame, Triangle* TrArray, int TriangleSize, glm::mat4 glmViewTransform, glm::mat4 glmProjectionTransform, glm::mat4 glmMVtransform) {
 
     // set up thread configuration
     int tileSize = 8;
     dim3 threadsPerBlock(tileSize, tileSize);
     dim3 fullBlocksPerGrid((int)ceil(float(resolution.x) / float(tileSize)), (int)ceil(float(resolution.y) / float(tileSize)));
 
-    //set up framebuffer
-    framebuffer = NULL;
-    int success = cudaMalloc((void**)&framebuffer, (int)resolution.x * (int)resolution.y * sizeof(glm::vec3));
+    Triangle* pTrArrayEnd = TrArray + TriangleSize;
+    for (Triangle* triangleIdx = TrArray; triangleIdx != pTrArrayEnd; ++triangleIdx) {
+        //Loop over all triangles
+        Triangle currTriangle = *triangleIdx;
+        ConvertToScreenspace(currTriangle, resolution);
 
-    //set up depthbuffer
-    depthbuffer = NULL;
-    success = cudaMalloc((void**)&depthbuffer, (int)resolution.x * (int)resolution.y * sizeof(fragment));
+        //set up framebuffer
+        framebuffer = NULL;
+        int success = cudaMalloc((void**)&framebuffer, (int)resolution.x * (int)resolution.y * sizeof(glm::vec3));
+
+        //set up depthbuffer
+        depthbuffer = NULL;
+        success = cudaMalloc((void**)&depthbuffer, (int)resolution.x * (int)resolution.y * sizeof(fragment));
+
+    }
+
+ 
+   
+
+    //Rasterization
+
+    //Primitive assembly
+
 
     render << <fullBlocksPerGrid, threadsPerBlock >> > (resolution, depthbuffer, framebuffer);
     sendImageToPBO << <fullBlocksPerGrid, threadsPerBlock >> > (PBOpos, resolution, framebuffer);
