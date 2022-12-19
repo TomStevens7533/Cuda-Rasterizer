@@ -26,18 +26,6 @@ struct cudaMat4 {
 	glm::vec4 w;
 };
 
-struct triangle {
-	glm::vec3 p0;
-	glm::vec3 p1;
-	glm::vec3 p2;
-	glm::vec3 c0;
-	glm::vec3 c1;
-	glm::vec3 c2;
-	glm::vec3 n0;
-	glm::vec3 n1;
-	glm::vec3 n2;
-	glm::vec3 flatNormal;
-};
 
 struct fragment {
 	glm::vec3 color;
@@ -45,7 +33,5 @@ struct fragment {
 	glm::vec3 position;
 	glm::vec3 cameraSpacePosition;
 	bool isEmpty;
-	bool isFlat;
-	float coverage;
 };
 

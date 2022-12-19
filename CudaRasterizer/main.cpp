@@ -176,7 +176,7 @@ void RunCuda(std::vector<Triangle>& triangleVector) {
 	size_t size;
 	cudaGraphicsMapResources(1, &m_cudaGraphicsResource);
 	cudaError_t x = cudaGraphicsResourceGetMappedPointer((void**)&dptr, &size, m_cudaGraphicsResource);
-	cudaRasterizeCore(dptr, glm::vec2(width, height), frame, triangleVector.data(), triangleVector.size() + 1, glmViewTransform, glmProjectionTransform, glmMVtransform);
+	cudaRasterizeCore(dptr, glm::vec2(width, height), frame, triangleVector.data(), triangleVector.size(), glmViewTransform, glmProjectionTransform, glmMVtransform);
 	cudaGraphicsUnmapResources(1, &m_cudaGraphicsResource);
 
 
@@ -196,7 +196,7 @@ bool InitFramework()
 
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
-	window = glfwCreateWindow(width, height, "Horsecock ofcourse cock", NULL, NULL);
+	window = glfwCreateWindow(width, height, "Very cool rasterizer ow ye", NULL, NULL);
 	if (!window)
 	{
 		glfwTerminate();
@@ -249,8 +249,8 @@ GLuint initShader() {
 	return program;
 }
 void InitCuda() {
-	// Use device with highest Gflops/s
-	cudaGLSetGLDevice(0);
+	// Use device with highest Gflops/s deprecated
+	//cudaError_t error =  cudaGLSetGLDevice(0);
 
 	// Clean up on program exit
 	atexit(cleanupCuda);
