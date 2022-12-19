@@ -1,15 +1,16 @@
 ﻿
 #include <stdio.h>
 #include <cuda.h>
+#include <cuda_runtime.h>
 #include <cmath>
 #include <thrust/random.h>
 #include "CudaKernel.h"
-
+#include <atomic>
 #include <thrust/remove.h>
 #include <thrust/count.h>
 #include <thrust/device_ptr.h>
 
-
+__device__ int* depthBufferLock;
 __device__ Triangle* trDeviceArray;
 __device__ glm::vec3* framebuffer;
 __device__ fragment* depthbuffer;
@@ -22,7 +23,15 @@ void checkCUDAError(const char* msg) {
     }
 }
 
-
+//fast initializor for int array
+__global__ void initiateArray(int* array, int val, int num)
+{
+    int index = (blockIdx.x * blockDim.x) + threadIdx.x;
+    if (index < num)
+    {
+        array[index] = val;
+    }
+}
 
 //How to call only other device fucntions+
 glm::vec2 ConvertToScreenspace(const glm::vec3 ndcPos, glm::vec2 resolution) {
@@ -49,9 +58,9 @@ __device__ float Cross(glm::vec2 lhs, glm::vec2 rhs) {
 }
 __device__ bool IsPixelInTriangle(Triangle tri, const glm::vec2 point, float* pWeight, glm::vec2 resolution) {
 
-    glm::vec2 ScreenspaceA = glm::vec2{ ((tri.vertices[0].x + 1) * 0.5f),  ((1 - tri.vertices[0].y) * 0.5f) * resolution.y };
-    glm::vec2 ScreenspaceB = glm::vec2{ ((tri.vertices[1].x + 1) * 0.5f),  ((1 - tri.vertices[1].y) * 0.5f) * resolution.y };
-    glm::vec2 ScreenspaceC = glm::vec2{ ((tri.vertices[2].x + 1) * 0.5f),  ((1 - tri.vertices[2].y) * 0.5f) * resolution.y };
+    glm::vec2 ScreenspaceA = glm::vec2{ ((tri.vertices[0].x + 1) * 0.5f) * resolution.x ,  ((1 - tri.vertices[0].y) * 0.5f) * resolution.y };
+    glm::vec2 ScreenspaceB = glm::vec2{ ((tri.vertices[1].x + 1) * 0.5f) * resolution.x,  ((1 - tri.vertices[1].y) * 0.5f) * resolution.y };
+    glm::vec2 ScreenspaceC = glm::vec2{ ((tri.vertices[2].x + 1) * 0.5f) * resolution.x,  ((1 - tri.vertices[2].y) * 0.5f) * resolution.y };
 
     glm::vec2 edgeA = glm::vec2(ScreenspaceB - ScreenspaceA);
     glm::vec2 edgeB = glm::vec2(ScreenspaceC - ScreenspaceB);
@@ -79,7 +88,6 @@ __device__ bool IsPixelInTriangle(Triangle tri, const glm::vec2 point, float* pW
     pWeight[0] = weight2 / totalSurface;
     pWeight[1] = weight1 / totalSurface;
     pWeight[2] = weight0 / totalSurface;
-    printf("Lol de meigd");
     return true;
 }
 //Kernel that writes the image to the OpenGL PBO directly. 
@@ -128,32 +136,39 @@ void RasterizeKernel(Triangle* primitives, int triangleSize, glm::vec2 resolutio
         float pixelWidth = 1.0f / (float)resolution.x;
         float pixelHeight = 1.0f / (float)resolution.y;
         float weights[3]{};
-        float halfResoX = 0.5f * (float)resolution.x;
-        float halfResoY = 0.5f * (float)resolution.y;
+
         //TODO Add Bounding Box
-        for (float i = 0; i < (Max.x - Min.x) / pixelWidth + 1.0f; i += 1.f)
+        for (int i = 0; i < resolution.x; i += 1)
         {
-            for (float j = 0; j < (Max.y - Min.y) / pixelHeight + 1.0f; j += 1.f)
+            for (int j = 0; j < resolution.y; j += 1)
             {
               
-               glm::vec2 pixelPos = glm::vec2(Min.x + i * pixelWidth, Min.y + j * pixelHeight);
+               glm::vec2 pixelPos = glm::vec2(i, j);
 
                fragment frag;
                frag.isEmpty = false;
                if (IsPixelInTriangle(currTriangle, pixelPos,weights, resolution)) { //In in triangle
 
-                   int x, y, pixelIndex;
-       
+                   int pixelIdx = i + (j * resolution.x);
 
-                   x = pixelPos.x * halfResoX + halfResoX;
-                   y = pixelPos.y * halfResoY + halfResoY;
-                   if (x < 0 || y < 0 || x > resolution.x || y > resolution.y) continue;
-                   pixelIndex = x + y * resolution.x;
+                 bool shouldWait = true;
+                 //while (shouldWait)
+                 //{
+                 //    if (atomicExch(&depthBufferLock[pixelIdx], 1) == 0)
+                 //    {
+                 //       
+                 //
+                 //        shouldWait = false;
+                 //        //depthBufferLock[pixelIdx] = 0;
+                 //    }
+                 //}
 
 
-                   frag.color = glm::vec3{ 0.f,0.f,0.f };
-                   depthbuffer[pixelIndex] = frag;
-               
+                    frag.color = glm::vec3{ 255.f,0.f,0.f };
+                    depthbuffer[pixelIdx] = frag;
+                   //We need to find a way to lock the depthbuffer so other threads cant access it
+                   printf("de meigd Soy");
+
                }
                else {
                }
@@ -178,8 +193,14 @@ void render(glm::vec2 resolution, fragment* depthbuffer, glm::vec3* framebuffer)
 
     if (x <= resolution.x && y <= resolution.y) {
 
-        framebuffer[index] = depthbuffer[index].color;
-        //framebuffer[index] = glm::vec3{255.f, 0.f, 0.f};
+        glm::vec3 fr = depthbuffer[index].color;
+
+        if (fr.x == 255.f)
+        {
+            printf("de meigd");
+        }
+        //framebuffer[index] = depthbuffer[index].color;
+        framebuffer[index] = glm::vec3{255.f, 0.f, 0.f};
 
     }
 }
@@ -197,7 +218,6 @@ void cudaRasterizeCore(uchar4* PBOpos, glm::vec2 resolution, float frame, Triang
     depthbuffer = NULL;
     err = cudaMalloc((void**)&depthbuffer, (int)resolution.x * (int)resolution.y * sizeof(fragment));
     checkCUDAError("Init depthbuffer failed");
-
 
     //Move Host memory To Device; Host == CPU && Device == GPU
     trDeviceArray = NULL;
