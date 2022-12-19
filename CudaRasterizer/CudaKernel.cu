@@ -13,13 +13,13 @@
 __device__ int* depthBufferLock;
 __device__ Triangle* trDeviceArray;
 __device__ glm::vec3* framebuffer;
-__device__ fragment* depthbuffer;
+fragment* depthbuffer;
 
 void checkCUDAError(const char* msg) {
     cudaError_t err = cudaGetLastError();
     if (cudaSuccess != err) {
         fprintf(stderr, "Cuda error: %s: %s.\n", msg, cudaGetErrorString(err));
-        // exit(EXIT_FAILURE); 
+            exit(EXIT_FAILURE); 
     }
 }
 
@@ -125,11 +125,10 @@ void sendImageToPBO(uchar4* PBOpos, glm::vec2 resolution, glm::vec3* image) {
     }
 }
 __global__
-void RasterizeKernel(Triangle* primitives, int triangleSize, glm::vec2 resolution) {
+void RasterizeKernel(Triangle* primitives, int triangleSize, glm::vec2 resolution, fragment* depthBuffer) {
     int triangleIdx = (blockIdx.x * blockDim.x) + threadIdx.x;
     if (triangleIdx < triangleSize) {
         Triangle currTriangle = primitives[triangleIdx];
-        //ConvertToScreenspace(currTriangle, resolution);
 
         glm::vec3 Min, Max;
         getBoundingBoxForTriangle(currTriangle, Min, Max);
@@ -151,23 +150,12 @@ void RasterizeKernel(Triangle* primitives, int triangleSize, glm::vec2 resolutio
 
                    int pixelIdx = i + (j * resolution.x);
 
-                 bool shouldWait = true;
-                 //while (shouldWait)
-                 //{
-                 //    if (atomicExch(&depthBufferLock[pixelIdx], 1) == 0)
-                 //    {
-                 //       
-                 //
-                 //        shouldWait = false;
-                 //        //depthBufferLock[pixelIdx] = 0;
-                 //    }
-                 //}
+                   bool shouldWait = true;
 
-
-                    frag.color = glm::vec3{ 255.f,0.f,0.f };
-                    depthbuffer[pixelIdx] = frag;
-                   //We need to find a way to lock the depthbuffer so other threads cant access it
-                   printf("de meigd Soy");
+                   frag.color = glm::vec3{ 255.f, 0.f, 0.f };
+                   depthBuffer[pixelIdx] = frag;
+                 
+                  
 
                }
                else {
@@ -185,7 +173,7 @@ void RasterizeKernel(Triangle* primitives, int triangleSize, glm::vec2 resolutio
 
 //Writes fragment colors to the framebuffer
 __global__ 
-void render(glm::vec2 resolution, fragment* depthbuffer, glm::vec3* framebuffer) {
+void render(glm::vec2 resolution, fragment* depthbuffer, glm::vec3* framebuffer, fragment* depthBuffer) {
 
     int x = (blockIdx.x * blockDim.x) + threadIdx.x;
     int y = (blockIdx.y * blockDim.y) + threadIdx.y;
@@ -193,14 +181,13 @@ void render(glm::vec2 resolution, fragment* depthbuffer, glm::vec3* framebuffer)
 
     if (x <= resolution.x && y <= resolution.y) {
 
-        glm::vec3 fr = depthbuffer[index].color;
+        framebuffer[index] = depthBuffer[index].color;
+        //framebuffer[index] = glm::vec3{ 255.f, 0.f, 0.f };
 
-        if (fr.x == 255.f)
-        {
-            printf("de meigd");
-        }
-        //framebuffer[index] = depthbuffer[index].color;
-        framebuffer[index] = glm::vec3{255.f, 0.f, 0.f};
+        //if (fr.x == 255.f)
+        //{
+        //    printf("de meigd");
+        //}
 
     }
 }
@@ -227,23 +214,31 @@ void cudaRasterizeCore(uchar4* PBOpos, glm::vec2 resolution, float frame, Triang
     err = cudaMemcpy(trDeviceArray, TrArray, TriangleSize * sizeof(Triangle), cudaMemcpyHostToDevice);
     checkCUDAError("Copying Triangle data failed");
 
+    int depthBufferLockSize = resolution.x * resolution.y;
+    depthBufferLock = NULL;
+    cudaMalloc((void**)&depthBufferLock, depthBufferLockSize * sizeof(int));
+    initiateArray << <dim3(ceil((float)depthBufferLockSize / ((float)512))), dim3(512) >> > (depthBufferLock, 0, depthBufferLockSize);
 
     // set up thread configuration
     int tileSize = 8;
     dim3 threadsPerBlock(tileSize, tileSize);
     dim3 fullBlocksPerGrid((int)ceil(float(resolution.x) / float(tileSize)), (int)ceil(float(resolution.y) / float(tileSize)));
 
-    RasterizeKernel <<<fullBlocksPerGrid, threadsPerBlock>>>(trDeviceArray, TriangleSize, resolution);
- 
+    RasterizeKernel <<<fullBlocksPerGrid, threadsPerBlock>>>(trDeviceArray, TriangleSize, resolution, depthbuffer);
     cudaDeviceSynchronize();
+
+    checkCUDAError("Rasterization failed");
 
     //Rasterization
 
     //Primitive assembly
 
 
-    render << <fullBlocksPerGrid, threadsPerBlock >> > (resolution, depthbuffer, framebuffer);
-    sendImageToPBO << <fullBlocksPerGrid, threadsPerBlock >> > (PBOpos, resolution, framebuffer);
+   render << <fullBlocksPerGrid, threadsPerBlock >> > (resolution, depthbuffer, framebuffer, depthbuffer);
+   checkCUDAError("Render failed");
+   sendImageToPBO << <fullBlocksPerGrid, threadsPerBlock >> > (PBOpos, resolution, framebuffer);
+   checkCUDAError("Sending To PBO failed");
+
 
     cudaDeviceSynchronize();
 
