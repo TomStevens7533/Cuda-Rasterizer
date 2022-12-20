@@ -1,4 +1,4 @@
-#include "Application.h"
+#include "Engine.h"
 
 int main() {
 
@@ -7,7 +7,7 @@ int main() {
 	//auto mesh = new obj();
 	//objLoader* loader = new objLoader(data, mesh);
 	//mesh->buildVBOs();
-	Application* app = new Application();
+	Engine* app = new Engine();
 	if (app->InitFramework()) {
 		app->mainLoop();
 	}

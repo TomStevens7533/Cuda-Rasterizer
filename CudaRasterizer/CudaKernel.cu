@@ -220,7 +220,7 @@ void kernelCleanup()
 }
 
 
-void cudaRasterizeCore(uchar4* PBOpos, glm::vec2 resolution, float frame, Triangle* TrArray, int TriangleSize) {
+void cudaRasterizeCore(uchar4* PBOpos, glm::vec2 resolution,const Triangle* TrArray, int TriangleSize) {
     //Init buffers
     //set up framebuffer
     checkCUDAError("Setup failed");
