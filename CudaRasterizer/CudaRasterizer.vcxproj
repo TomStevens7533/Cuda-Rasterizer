@@ -14,6 +14,9 @@
     <CudaCompile Include="CudaKernel.cu" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Application.cpp" />
+    <ClCompile Include="Camera.cpp" />
+    <ClCompile Include="Input.cpp" />
     <ClCompile Include="interop.cpp" />
     <ClCompile Include="InteropFrameBuffer.cpp" />
     <ClCompile Include="main.cpp" />
@@ -22,8 +25,10 @@
     <ClCompile Include="utilities.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Application.h" />
+    <ClInclude Include="Camera.h" />
     <ClInclude Include="CudaKernel.h" />
-    <ClInclude Include="glslutility.h" />
+    <ClInclude Include="Input.h" />
     <ClInclude Include="interop.h" />
     <ClInclude Include="InteropFrameBuffer.h" />
     <ClInclude Include="obj.h" />

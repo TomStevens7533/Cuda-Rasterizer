@@ -191,11 +191,7 @@ void render(glm::vec2 resolution, fragment* depthbuffer, glm::vec3* framebuffer,
 
     }
 }
-
-void cudaRasterizeCore(uchar4* PBOpos, glm::vec2 resolution, float frame, Triangle* TrArray, int TriangleSize, glm::mat4 glmViewTransform, glm::mat4 glmProjectionTransform, glm::mat4 glmMVtransform) {
-    //Init buffers
-    //set up framebuffer
-    checkCUDAError("Setup failed");
+void InitializeBuffers(glm::vec2 resolution) {
 
     framebuffer = NULL;
     cudaError_t err = cudaMalloc((void**)&framebuffer, (int)resolution.x * (int)resolution.y * sizeof(glm::vec3));
@@ -206,18 +202,36 @@ void cudaRasterizeCore(uchar4* PBOpos, glm::vec2 resolution, float frame, Triang
     err = cudaMalloc((void**)&depthbuffer, (int)resolution.x * (int)resolution.y * sizeof(fragment));
     checkCUDAError("Init depthbuffer failed");
 
-    //Move Host memory To Device; Host == CPU && Device == GPU
-    trDeviceArray = NULL;
-
-    // Allocate Unified Memory – accessible from CPU or GPU
-    err = cudaMallocManaged((void**)&trDeviceArray, TriangleSize * sizeof(Triangle));
-    err = cudaMemcpy(trDeviceArray, TrArray, TriangleSize * sizeof(Triangle), cudaMemcpyHostToDevice);
-    checkCUDAError("Copying Triangle data failed");
-
     int depthBufferLockSize = resolution.x * resolution.y;
     depthBufferLock = NULL;
     cudaMalloc((void**)&depthBufferLock, depthBufferLockSize * sizeof(int));
     initiateArray << <dim3(ceil((float)depthBufferLockSize / ((float)512))), dim3(512) >> > (depthBufferLock, 0, depthBufferLockSize);
+    checkCUDAError("Init depthbufferLock failed");
+
+
+}
+
+void kernelCleanup()
+{
+    cudaFree(trDeviceArray);
+    cudaFree(framebuffer);
+    cudaFree(depthbuffer);
+    cudaFree(depthBufferLock);
+}
+
+
+void cudaRasterizeCore(uchar4* PBOpos, glm::vec2 resolution, float frame, Triangle* TrArray, int TriangleSize) {
+    //Init buffers
+    //set up framebuffer
+    checkCUDAError("Setup failed");
+
+    //Move Host memory To Device; Host == CPU && Device == GPU
+    trDeviceArray = NULL;
+    cudaError_t err;
+    // Allocate Unified Memory – accessible from CPU or GPU
+    err = cudaMallocManaged((void**)&trDeviceArray, TriangleSize * sizeof(Triangle));
+    err = cudaMemcpy(trDeviceArray, TrArray, TriangleSize * sizeof(Triangle), cudaMemcpyHostToDevice);
+    checkCUDAError("Copying Triangle data failed");
 
     // set up thread configuration
     int tileSize = 8;
@@ -243,7 +257,4 @@ void cudaRasterizeCore(uchar4* PBOpos, glm::vec2 resolution, float frame, Triang
     cudaDeviceSynchronize();
 
 
-    cudaFree(trDeviceArray);
-    cudaFree(framebuffer);
-    cudaFree(depthbuffer);
 }
