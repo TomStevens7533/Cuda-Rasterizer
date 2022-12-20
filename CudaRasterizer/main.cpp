@@ -18,12 +18,6 @@
 #define FOV_DEG 30
 #define MOUSE_SCROLL_SPEED 0.1f
 
-light Light;
-
-//transformations
-glm::mat4 glmViewTransform;
-glm::mat4 glmProjectionTransform;
-glm::mat4 glmMVtransform;
 //-------------------------------
 //------------Window-------------
 //-------------------------------
@@ -31,17 +25,6 @@ int height = 800;
 int width = 800;
 //keyboard control
 //mouse control stuff
-bool mouseButtonIsDown = false;
-float mouseScrollOffset = 0.0f;
-double mouseClickedX = 0.0f;
-double mouseClickedY = 0.0f;
-double rotationX = 0.0f;
-double rotationY = 0.0f;
-double mouseDeltaX = 0.0f;
-double mouseDeltaY = 0.0f;
-double deltaX = 0.0f;
-double deltaZ = 0.0f;
-double cameraMovementIncrement = 0.015f;
 //toggle view
 bool isFkeyDown = false;
 int isFlatShading = false;
@@ -51,7 +34,8 @@ int isMeshView = false;
 //-------------------------------
 //------------GL STUFF-----------
 //-------------------------------
-int frame;
+int frame{};
+double lastTime{};
 int fpstracker;
 double seconds;
 int fps = 0;
@@ -62,18 +46,8 @@ GLuint pbo = (GLuint)NULL;
 GLuint displayImage;
 uchar4* dptr;
 
-GLFWwindow* window;
+GLFWwindow* pWindow;
 
-obj* mesh;
-
-float* vbo;
-int vbosize;
-float* cbo;
-int cbosize;
-int* ibo;
-int ibosize;
-float* nbo;
-int nbosize;
 //-------------------------------
 //----------SETUP----------------
 //-------------------------------
@@ -89,6 +63,7 @@ void deletePBO(GLuint* pbo);
 
 void mainLoop();
 void RunCuda(std::vector<Triangle>& triangleVector);
+void ShowFPS();
 
 //------------------------------
 //-------GLFW CALLBACKS---------
@@ -105,13 +80,12 @@ cudaTextureObject_t m_texture;
 int main() {
 
 	//Create obj
-	std::string data{"obj/cube.obj"};
-	mesh = new obj();
-	objLoader* loader = new objLoader(data, mesh);
-	mesh->buildVBOs();
+	//std::string data{"obj/cube.obj"};
+	//auto mesh = new obj();
+	//objLoader* loader = new objLoader(data, mesh);
+	//mesh->buildVBOs();
 
 
-	std::cout << "Hello world\n";	
 	if (InitFramework()) {
 		// GLFW main loop
 		mainLoop();
@@ -121,7 +95,7 @@ int main() {
 void mainLoop() {
 
 
-	while (!glfwWindowShouldClose(window)) {
+	while (!glfwWindowShouldClose(pWindow)) {
 
 		//camera rotation, zoom control using mouse
 		double* mouseX = new double;
@@ -133,18 +107,7 @@ void mainLoop() {
 		float fov_rad = FOV_DEG * PI / 180.0f;
 		float AR = width / height;
 
-		//glm::mat4 ModelTransform =utilityCore::buildTransformationMatrix(glm::vec3(0.0f),glm::vec3(0.0f,0.0f,0.0f),glm::vec3(1.0f));
-		glm::mat4 ModelTransform = utilityCore::buildTransformationMatrix(glm::vec3(0.0f), glm::vec3(-(rotationY + mouseDeltaY), -(rotationX + mouseDeltaX + 10.0f), 0.0f), glm::vec3(0.6f));
 
-		glm::mat4 cameraAimTransform = utilityCore::buildTransformationMatrix(glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(1.0f));
-		//glm::mat4 cameraAimTransform = utilityCore::buildTransformationMatrix(glm::vec3(0.0f),glm::vec3(-(rotationY + mouseDeltaY),- (rotationX + mouseDeltaX + 10.0f),0.0f),glm::vec3(1.0f));
-		glm::mat4 cameraPosTransform = utilityCore::buildTransformationMatrix(glm::vec3(0.0f + deltaX, -.25f + deltaZ, (2.0f + MOUSE_SCROLL_SPEED * mouseScrollOffset)), glm::vec3(0.0f), glm::vec3(1.0f));
-		glm::mat4 ViewTransform = cameraAimTransform * cameraPosTransform;
-		//glm::mat4 ViewTransform =utilityCore::buildTransformationMatrix(glm::vec3(0.0f + deltaX,-.25f,2.0f + deltaZ + MOUSE_SCROLL_SPEED * mouseScrollOffset),glm::vec3(-(rotationY + mouseDeltaY),- (rotationX + mouseDeltaX),0.0f),glm::vec3(1.0f));
-
-		glmViewTransform = ViewTransform;
-		glmProjectionTransform = glm::perspective((float)45.0f, AR, 1.0f, 50.0f);
-		glmMVtransform = ViewTransform * ModelTransform;
 
 		std::vector<Triangle> triangleVec;
 		Triangle tr;
@@ -162,13 +125,35 @@ void mainLoop() {
 
 		// VAO, shader program, and texture already bound
 		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, 0);
-		glfwSwapBuffers(window);
+		glfwSwapBuffers(pWindow);
 		glfwPollEvents();
+		ShowFPS();
 	}
 
-	glfwDestroyWindow(window);
+	glfwDestroyWindow(pWindow);
 	glfwTerminate();
 }
+void ShowFPS()
+{
+	double currentTime = glfwGetTime();
+	double delta = currentTime - lastTime;
+	frame++;
+	if (delta >= 1.0) { // If last cout was more than 1 sec ago
+		cout << 1000.0 / double(frame) << endl;
+
+		double fps = double(frame) / delta;
+
+		std::stringstream ss;
+		ss << "Soy de meigd" << " [" << fps << " FPS]";
+
+		glfwSetWindowTitle(pWindow, ss.str().c_str());
+
+		frame = 0;
+		lastTime = currentTime;
+	}
+}
+
+
 void RunCuda(std::vector<Triangle>& triangleVector) {
 	// Map OpenGL buffer object for writing from CUDA on a single GPU
 	// No data is moved (Win & Linux). When mapped to CUDA, OpenGL should not use this buffer
@@ -176,7 +161,7 @@ void RunCuda(std::vector<Triangle>& triangleVector) {
 	size_t size;
 	cudaGraphicsMapResources(1, &m_cudaGraphicsResource);
 	cudaError_t x = cudaGraphicsResourceGetMappedPointer((void**)&dptr, &size, m_cudaGraphicsResource);
-	cudaRasterizeCore(dptr, glm::vec2(width, height), frame, triangleVector.data(), triangleVector.size(), glmViewTransform, glmProjectionTransform, glmMVtransform);
+	cudaRasterizeCore(dptr, glm::vec2(width, height), frame, triangleVector.data(), triangleVector.size(), glm::mat4{}, glm::mat4{}, glm::mat4{});
 	cudaGraphicsUnmapResources(1, &m_cudaGraphicsResource);
 
 
@@ -196,15 +181,15 @@ bool InitFramework()
 
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
-	window = glfwCreateWindow(width, height, "Very cool rasterizer ow ye", NULL, NULL);
-	if (!window)
+	pWindow = glfwCreateWindow(width, height, "Very cool rasterizer ow ye", NULL, NULL);
+	if (!pWindow)
 	{
 		glfwTerminate();
 		return false;
 		// Window or OpenGL context creation failed
 	}
-	glfwMakeContextCurrent(window);
-	glfwSetKeyCallback(window, keyCallback);
+	glfwMakeContextCurrent(pWindow);
+	glfwSetKeyCallback(pWindow, keyCallback);
 
 	//glewExperimental = true;
 	glewExperimental = GL_TRUE;
@@ -355,5 +340,5 @@ void keyCallback(GLFWwindow* pwindow, int key, int, int action, int)
 
 void errorCallback(int, const char* description)
 {
-	std::cout << description << std::endl;
+	std::cerr << "GLFW error detected: " << description << std::endl;
 }
