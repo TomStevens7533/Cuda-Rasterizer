@@ -1,41 +1,17 @@
 #include "Engine.h"
 #include "Renderer.h"
 
+
+Engine::Engine() : m_Application{width, height}
+{
+
+}
+
 bool Engine::InitFramework()
 {
-	glfwSetErrorCallback([](int error, const char* description) {
-			std::cerr << "GLFW error detected: " << description << std::endl;
-		}
-	);
-	if (!glfwInit())
-	{
-		// Initialization failed
-		std::cout << "glfw failed initialization!\n";
-	}
-
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
-	pWindow = glfwCreateWindow(width, height, "Very cool rasterizer ow ye", NULL, NULL);
-	if (!pWindow)
-	{
-		glfwTerminate();
-		return false;
-		// Window or OpenGL context creation failed
-	}
-	glfwMakeContextCurrent(pWindow);
-
+	
 
 	
-	//Key callback
-	glfwSetKeyCallback(pWindow, [](GLFWwindow* window, int Key, int scancode, int action, int mods)
-		{
-			//Set GLFW to close next frame
-			if (Key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
-				glfwSetWindowShouldClose(window, GL_TRUE);
-			}
-		}
-	);
-
 	//glewExperimental = true;
 	glewExperimental = GL_TRUE;
 	GLenum err = glewInit();
@@ -47,7 +23,6 @@ bool Engine::InitFramework()
 
 	}
 	fprintf(stdout, "Status: Using GLEW %s\n", glewGetString(GLEW_VERSION));
-
 	// Initialize other stuff
 	InitBuffers();
 	InitTextures();
@@ -66,7 +41,7 @@ bool Engine::InitFramework()
 void Engine::mainLoop()
 {
 	m_Application.Start();
-	while (!glfwWindowShouldClose(pWindow)) {
+	while (m_Running) {
 
 		//camera rotation, zoom control using mouse
 		double* mouseX = new double;
@@ -81,6 +56,8 @@ void Engine::mainLoop()
 		cudaGraphicsMapResources(1, &m_cudaGraphicsResource);
 		cudaError_t x = cudaGraphicsResourceGetMappedPointer((void**)&dptr, &size, m_cudaGraphicsResource);
 
+		m_Camera.UpdateCamera();
+
 		//Start scene
 		SceneData scData;
 		scData.PBOpos = dptr;
@@ -90,7 +67,6 @@ void Engine::mainLoop()
 		
 		//Update application
 		m_Application.Update();
-
 
 		//End Scene
 		cudaGraphicsUnmapResources(1, &m_cudaGraphicsResource);
@@ -103,13 +79,13 @@ void Engine::mainLoop()
 
 		// VAO, shader program, and texture already bound
 		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, 0);
-		glfwSwapBuffers(pWindow);
-		glfwPollEvents();
-		ShowFPS();
+		m_Application.GetWindow().SwapWindow();
+
+
+		
 	}
 
-	glfwDestroyWindow(pWindow);
-	glfwTerminate();
+	
 	kernelCleanup();
 	cleanupCuda();
 }
@@ -260,23 +236,4 @@ void Engine::deletePBO(GLuint* pbo)
 	}
 }
 
-
-void Engine::ShowFPS()
-{
-	double currentTime = glfwGetTime();
-	double delta = currentTime - lastTime;
-	frame++;
-	if (delta >= 1.0) { // If last cout was more than 1 sec ago
-
-		double fps = double(frame) / delta;
-
-		std::stringstream ss;
-		ss << "Soy de meigd" << " [" << fps << " FPS]";
-
-		glfwSetWindowTitle(pWindow, ss.str().c_str());
-
-		frame = 0;
-		lastTime = currentTime;
-	}
-}
 

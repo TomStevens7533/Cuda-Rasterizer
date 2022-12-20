@@ -3,16 +3,20 @@
 #include "Structs.h"
 #include "Renderer.h"
 
+Application* Application::s_Instance = nullptr;
 
-Application::Application()
+Application::Application(int width, int height) : m_Window{width, height}
 {
-
+	s_Instance = this;
+	m_Window.InitWindow();
 }
 
 Application::~Application()
 {
-
+	
 }
+
+
 
 void Application::Start()
 {

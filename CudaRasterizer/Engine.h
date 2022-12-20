@@ -5,7 +5,6 @@
 #define MOUSE_SCROLL_SPEED 0.1f
 
 #include <glew.h>
-#include <glfw3.h>
 
 #include <cuda_runtime.h>
 #include <cuda_gl_interop.h>
@@ -19,6 +18,7 @@
 class Engine
 {
 public:
+	Engine();
 	bool InitFramework();
 	void mainLoop();
 private:
@@ -28,7 +28,6 @@ private:
 	void cleanupCuda();
 	void deleteTexture(GLuint* tex);
 	void deletePBO(GLuint* pbo);
-	void ShowFPS();
 	void compileShader(const char* shaderName, const char* shaderSource, GLenum shaderType, GLint& shaders);
 private:
 
@@ -38,16 +37,15 @@ private:
 	//-------------------------------
 	int height = 800;
 	int width = 800;
-	int frame{};
-	double lastTime{};
+
 	int fpstracker;
 	double seconds;
+	bool m_Running{true};
 	int fps = 0;
 	GLuint positionLocation = 0;
 	GLuint texcoordsLocation = 1;
 	GLuint pbo = (GLuint)NULL;
 	GLuint displayImage;
-	GLFWwindow* pWindow;
 	cudaGraphicsResource_t m_cudaGraphicsResource;
 	cudaArray* m_cudaArray;
 	cudaTextureObject_t m_texture;

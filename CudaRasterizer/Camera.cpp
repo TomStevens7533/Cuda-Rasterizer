@@ -1,8 +1,9 @@
 #include "Camera.h"
-#include <ostream>
+#include "Input.h"
+#include "KeyMouseCodes.h"
 #include <iostream>
 
-#include "gtx/quaternion.hpp"
+
 
 
 
@@ -68,6 +69,112 @@ glm::mat4x4& Camera::GetONB()
 
 void Camera::UpdateCamera()
 {
+
+	glm::vec3 upVec = glm::vec3(0.0f, 1.0f, 0.0f);
+	glm::vec3 forwardVec = getForward();
+	glm::vec3 rightVec = getLeft();
+
+
+	upVec = glm::cross(forwardVec, rightVec);
+
+	glm::vec3 newPos = m_Position;
+
+
+	int multiplier = 1;
+	if (Input::IsKeyPressed(KEY_LEFT_ALT))
+		multiplier++;
+	if (Input::IsKeyPressed(KEY_D)) {
+		newPos -= rightVec * (m_CameraMovementSpeed * multiplier);
+		//EU_CORE_INFO("NEW POS: X {0}, Y {1}, Z {2}", newPos.x, newPos.y, newPos.z);
+		m_UpdateNeeded = true;
+	}
+	if (Input::IsKeyPressed(KEY_A)) {
+		newPos += rightVec * ((m_CameraMovementSpeed * multiplier));
+		//EU_CORE_INFO("NEW POS: X {0}, Y {1}, Z {2}", newPos.x, newPos.y, newPos.z);
+
+		m_UpdateNeeded = true;
+	}
+	if (Input::IsKeyPressed(KEY_W)) {
+		newPos += forwardVec * ((m_CameraMovementSpeed * multiplier));
+		//EU_CORE_INFO("NEW POS: X {0}, Y {1}, Z {2}", newPos.x, newPos.y, newPos.z);
+
+		m_UpdateNeeded = true;
+	}
+
+	if (Input::IsKeyPressed(KEY_S)) {
+		newPos -= forwardVec * ((m_CameraMovementSpeed * multiplier));
+		//EU_CORE_INFO("NEW POS: X {0}, Y {1}, Z {2}", newPos.x, newPos.y, newPos.z);
+
+		m_UpdateNeeded = true;
+	}
+	if (Input::IsKeyPressed(KEY_SPACE)) {
+		newPos += upVec * ((m_CameraMovementSpeed * multiplier));
+		//EU_CORE_INFO("NEW POS: X {0}, Y {1}, Z {2}", newPos.x, newPos.y, newPos.z);
+
+		m_UpdateNeeded = true;
+	}
+	if (Input::IsKeyPressed(KEY_C)) {
+		newPos -= upVec * ((m_CameraMovementSpeed * multiplier));
+		//EU_CORE_INFO("NEW POS: X {0}, Y {1}, Z {2}", newPos.x, newPos.y, newPos.z);
+
+		m_UpdateNeeded = true;
+
+	}
+	m_Position = newPos;
+	//Rotation
+	if (Input::IsMouseButtonPressed(MOUSE_BUTTON_2)) { //Remove make button configurable
+		int x = Input::GetMouseX();
+		int y = Input::GetMouseY();
+
+		if (m_IsFirstUpdate)
+		{
+			m_OldScreenPos.x = x;
+			m_OldScreenPos.y = y;
+
+			m_IsFirstUpdate = false;
+			return;
+		}
+		m_ScreenPosOffset = { x - m_OldScreenPos.x, y - m_OldScreenPos.y };
+
+		m_OldScreenPos.x = x;
+		m_OldScreenPos.y = y;
+
+		//TODO: Use time
+		m_ScreenPosOffset = m_ScreenPosOffset * (m_sensitivity);
+
+
+		m_CameraRot.y += m_ScreenPosOffset.x; //yaw rotate x
+		m_CameraRot.x += m_ScreenPosOffset.y; //pitch rotate y
+		m_CameraRot.z = 0;
+
+
+
+		if (m_CameraRot.x > 89.0f)
+			m_CameraRot.x = 89.0f;
+		if (m_CameraRot.x < -89.0f)
+			m_CameraRot.x = -89.0f;
+
+		RotateYaw(m_ScreenPosOffset.x);
+		RotatePitch(m_ScreenPosOffset.y);
+
+		m_UpdateNeeded = true;
+
+	}
+	int x = Input::GetMouseX();
+	int y = Input::GetMouseY();
+	m_OldScreenPos.x = x;
+	m_OldScreenPos.y = y;
+
+
+	if (m_UpdateNeeded) {
+
+		auto worldPos = m_Position;
+		auto look = getForward();
+		std::cout << "Update matrix\n";
+
+		CalcViewMatrix((glm::lookAt(worldPos, worldPos + look, glm::vec3{ 0,1,0 })), worldPos);
+		m_UpdateNeeded = false;
+	}
 
 }
 

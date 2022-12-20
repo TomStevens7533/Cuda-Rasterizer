@@ -2,7 +2,6 @@
 #include <glm.hpp>
 #include "gtx/quaternion.hpp"
 
-
 class Camera final
 {
 public:
@@ -47,6 +46,23 @@ private:
 	glm::mat4 m_ViewProjMatrix{};
 	glm::mat4 m_Proj{};
 	glm::mat4 m_View{};
+
+	float m_FOV;
+	bool m_UpdateNeeded{ true };
+
+	bool m_IsFirstUpdate;
+	glm::vec2 m_OldScreenPos;
+	glm::vec2 m_ScreenPosOffset;
+	glm::vec3 m_CameraRot{};
+
+
+
+
+	float m_sensitivity = 120.f;
+	//variables
+	float m_CameraMovementSpeed{ 5.5f };
+	float m_RotationSpeed{ 90.f };
+
 
 };
 
