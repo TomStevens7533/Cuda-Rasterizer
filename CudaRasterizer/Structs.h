@@ -7,7 +7,7 @@ struct Input_Triangle
 };
 struct Output_Triangle
 {
-	glm::vec3 vertices[3];
+	glm::vec4 vertices[3];
 };
 
 struct cudaMat3 {

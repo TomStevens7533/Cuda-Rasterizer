@@ -14,6 +14,7 @@ __device__ int* depthBufferLock;
 __device__ Input_Triangle* trDeviceArray;
 __device__ glm::vec3* framebuffer;
 fragment* depthbuffer;
+cudaMat4* MV;
 
 void checkCUDAError(const char* msg) {
     cudaError_t err = cudaGetLastError();
@@ -124,16 +125,40 @@ void sendImageToPBO(uchar4* PBOpos, glm::vec2 resolution, glm::vec3* image) {
         PBOpos[index].z = color.z;
     }
 }
+cudaMat4 glmMat4ToCudaMat4(glm::mat4 a) {
+    //swap from glm column major to cuda row major
+    cudaMat4 m; a = glm::transpose(a);
+    m.x = a[0];
+    m.y = a[1];
+    m.z = a[2];
+    m.w = a[3];
+    return m;
+}
+__host__ __device__ glm::vec4 multiplyMV4(cudaMat4 m, glm::vec4 v) {
+    glm::vec4 r(1, 1, 1, 1);
+    r.x = (m.x.x * v.x) + (m.x.y * v.y) + (m.x.z * v.z) + (m.x.w * v.w);
+    r.y = (m.y.x * v.x) + (m.y.y * v.y) + (m.y.z * v.z) + (m.y.w * v.w);
+    r.z = (m.z.x * v.x) + (m.z.y * v.y) + (m.z.z * v.z) + (m.z.w * v.w);
+    r.w = (m.w.x * v.x) + (m.w.y * v.y) + (m.w.z * v.z) + (m.w.w * v.w);
+    return r;
+}
+
 __global__
-void RasterizeKernel(Input_Triangle* primitives, int triangleSize, glm::vec2 resolution, fragment* depthBuffer, glm::mat4x4 worldviewprojMat) {
+void RasterizeKernel(Input_Triangle* primitives, int triangleSize, glm::vec2 resolution, fragment* depthBuffer, cudaMat4* worldviewprojMat) {
     int triangleIdx = (blockIdx.x * blockDim.x) + threadIdx.x;
     if (triangleIdx < triangleSize) {
         Input_Triangle currTriangle = primitives[triangleIdx];
         Output_Triangle outputTriangle;
-        outputTriangle.vertices[0] = worldviewprojMat * glm::vec4(currTriangle.vertices[0], 1.f);
-        outputTriangle.vertices[1] = worldviewprojMat * glm::vec4(currTriangle.vertices[1], 1.f);
-        outputTriangle.vertices[2] = worldviewprojMat * glm::vec4(currTriangle.vertices[2], 1.f);
 
+        //To viewspace
+        glm::vec4 viewSpaceP0 = multiplyMV4(*worldviewprojMat , glm::vec4(currTriangle.vertices[0], 1.f));
+        glm::vec4 viewSpaceP1=  multiplyMV4(*worldviewprojMat , glm::vec4(currTriangle.vertices[1], 1.f));
+        glm::vec4 viewSpaceP3 = multiplyMV4(*worldviewprojMat , glm::vec4(currTriangle.vertices[2], 1.f));
+
+        //To NDC 
+        outputTriangle.vertices[0] = glm::vec4(viewSpaceP0.x / viewSpaceP0.w, viewSpaceP0.y / viewSpaceP0.w, viewSpaceP0.z / viewSpaceP0.w, viewSpaceP0.w);
+        outputTriangle.vertices[1] = glm::vec4(viewSpaceP1.x / viewSpaceP1.w, viewSpaceP1.y / viewSpaceP1.w, viewSpaceP1.z / viewSpaceP1.w, viewSpaceP1.w);
+        outputTriangle.vertices[2] = glm::vec4(viewSpaceP3.x / viewSpaceP3.w, viewSpaceP3.y / viewSpaceP3.w, viewSpaceP3.z / viewSpaceP3.w, viewSpaceP3.w);
 
         glm::vec3 Min, Max;
         getBoundingBoxForTriangle(outputTriangle, Min, Max);
@@ -160,7 +185,7 @@ void RasterizeKernel(Input_Triangle* primitives, int triangleSize, glm::vec2 res
                    frag.color = glm::vec3{ 255.f, 0.f, 0.f };
                    depthBuffer[pixelIdx] = frag;
                  
-                  
+
 
                }
                else {
@@ -213,6 +238,7 @@ void InitializeBuffers(glm::vec2 resolution) {
     initiateArray << <dim3(ceil((float)depthBufferLockSize / ((float)512))), dim3(512) >> > (depthBufferLock, 0, depthBufferLockSize);
     checkCUDAError("Init depthbufferLock failed");
 
+    MV = new cudaMat4;
 
 }
 
@@ -224,17 +250,44 @@ void kernelCleanup()
     cudaFree(depthBufferLock);
 }
 
+//Kernel that clears a given pixel buffer with a given color
+__global__ void clearImage(glm::vec2 resolution, glm::vec3* image, glm::vec3 color) {
+    int x = (blockIdx.x * blockDim.x) + threadIdx.x;
+    int y = (blockIdx.y * blockDim.y) + threadIdx.y;
+    int index = x + (y * resolution.x);
+    if (x <= resolution.x && y <= resolution.y) {
+        image[index] = color;
+    }
+}
+//Kernel that clears a given fragment buffer with a given fragment
+__global__ void clearDepthBuffer(glm::vec2 resolution, fragment* buffer, fragment frag) {
+    int x = (blockIdx.x * blockDim.x) + threadIdx.x;
+    int y = (blockIdx.y * blockDim.y) + threadIdx.y;
+    int index = x + (y * resolution.x);
+    if (x <= resolution.x && y <= resolution.y) {
+        fragment f = frag;
+        buffer[index] = f;
+    }
+}
 
 void cudaRasterizeCore(uchar4* PBOpos, glm::vec2 resolution,const Input_Triangle* TrArray, int TriangleSize, glm::mat4 worldviewprojMat) {
     //Init buffers
     //set up framebuffer
+   
     checkCUDAError("Setup failed");
 
     //Move Host memory To Device; Host == CPU && Device == GPU
+   
+
     trDeviceArray = NULL;
-    cudaError_t err;
+
+
+    cudaMat4* dev_MVtransform;
+    *MV = glmMat4ToCudaMat4(worldviewprojMat);
+    cudaMalloc((void**)&dev_MVtransform, sizeof(cudaMat4));
+    cudaMemcpy(dev_MVtransform, MV, sizeof(cudaMat4), cudaMemcpyHostToDevice);
     // Allocate Unified Memory – accessible from CPU or GPU
-    err = cudaMallocManaged((void**)&trDeviceArray, TriangleSize * sizeof(Input_Triangle));
+    cudaError_t err = cudaMallocManaged((void**)&trDeviceArray, TriangleSize * sizeof(Input_Triangle));
     err = cudaMemcpy(trDeviceArray, TrArray, TriangleSize * sizeof(Input_Triangle), cudaMemcpyHostToDevice);
     checkCUDAError("Copying Triangle data failed");
 
@@ -243,7 +296,16 @@ void cudaRasterizeCore(uchar4* PBOpos, glm::vec2 resolution,const Input_Triangle
     dim3 threadsPerBlock(tileSize, tileSize);
     dim3 fullBlocksPerGrid((int)ceil(float(resolution.x) / float(tileSize)), (int)ceil(float(resolution.y) / float(tileSize)));
 
-    RasterizeKernel <<<fullBlocksPerGrid, threadsPerBlock>>>(trDeviceArray, TriangleSize, resolution, depthbuffer, worldviewprojMat);
+    fragment frag;
+    frag.color = glm::vec3(0, 0, 0);
+    frag.normal = glm::vec3(0, 0, 0);
+    frag.position = glm::vec3(0, 0, -10000);
+    frag.cameraSpacePosition = glm::vec3(0, 0, -10000);
+    frag.isEmpty = true;
+    clearImage << <fullBlocksPerGrid, threadsPerBlock >> > (resolution, framebuffer, glm::vec3(0, 0, 0));
+    clearDepthBuffer << <fullBlocksPerGrid, threadsPerBlock >> > (resolution, depthbuffer, frag);
+    cudaDeviceSynchronize();
+    RasterizeKernel <<<fullBlocksPerGrid, threadsPerBlock>>>(trDeviceArray, TriangleSize, resolution, depthbuffer, dev_MVtransform);
     cudaDeviceSynchronize();
 
     checkCUDAError("Rasterization failed");

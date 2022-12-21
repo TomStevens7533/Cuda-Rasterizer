@@ -5,14 +5,13 @@
 class Camera final
 {
 public:
-	Camera();
+	Camera(float fov);
 	const glm::mat4& GetViewProjectionMatrix() const;
 	const glm::mat4& GetProjectionMatrix() const;
 	glm::quat RotateDegrees(float angleRadians, const glm::vec3& axis);
 
 	void CalculateProjectionMatrix(float fov, float aspectRatio = 1.77f);
 	void CalcViewMatrix(glm::mat4x4 view, glm::vec3 pos);
-	glm::mat4x4& GetONB();
 
 	void UpdateCamera();
 
@@ -35,7 +34,7 @@ private:
 	float m_FarPlane = 1000.f;
 	float m_NearPlane = 0.1f;
 
-	glm::vec3 m_Position{};
+	glm::vec3 m_Position{ };
 	glm::quat m_CameraQuaternion{};
 
 	glm::quat m_CameraQuaternionYaw{};
@@ -60,7 +59,7 @@ private:
 
 	float m_sensitivity = 120.f;
 	//variables
-	float m_CameraMovementSpeed{ 5.5f };
+	float m_CameraMovementSpeed{ 0.5f };
 	float m_RotationSpeed{ 90.f };
 
 

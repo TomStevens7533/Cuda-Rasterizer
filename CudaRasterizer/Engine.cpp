@@ -2,7 +2,7 @@
 #include "Renderer.h"
 
 
-Engine::Engine() : m_Application{width, height}
+Engine::Engine() : m_Application{width, height}, m_Camera{60}
 {
 
 }

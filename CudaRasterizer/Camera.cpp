@@ -7,7 +7,7 @@
 
 
 
-Camera::Camera()
+Camera::Camera(float fov)
 {
 	m_ViewProjMatrix = glm::mat4(1.0);
 	m_CameraQuaternionPitch = glm::angleAxis(glm::radians(0.f), glm::vec3(1, 0, 0));
@@ -15,7 +15,7 @@ Camera::Camera()
 	m_CameraQuaternionRoll = glm::angleAxis(glm::radians(0.f), glm::vec3(0, 0, 1));
 	
 	m_CameraQuaternion= glm::qua<float, glm::defaultp>(static_cast<float>(1), static_cast<float>(0), static_cast<float>(0), static_cast<float>(0));
-
+	CalculateProjectionMatrix(fov, 800.f/ 800.f);
 }
 const glm::mat4& Camera::GetViewProjectionMatrix() const
 {
@@ -41,7 +41,7 @@ glm::quat Camera::RotateDegrees(float angleRadians, const glm::vec3& axis)
 void Camera::CalculateInverseONB()
 {
 
-	m_ViewProjMatrix = m_Proj * m_View;
+	m_ViewProjMatrix = glm::inverse(m_View) * m_Proj;
 
 
 }
@@ -55,17 +55,20 @@ void Camera::CalculateProjectionMatrix(float fov, float aspectRatio)
 
 void Camera::CalcViewMatrix(glm::mat4x4 view, glm::vec3 pos)
 {
-	m_CameraQuaternion =  m_CameraQuaternionYaw * m_CameraQuaternionPitch;
+	m_CameraQuaternion = m_CameraQuaternionYaw * m_CameraQuaternionPitch;
 	m_CameraQuaternion = glm::quat(m_CameraQuaternion.x, m_CameraQuaternion.y, m_CameraQuaternion.z, m_CameraQuaternion.w);
-	m_View = glm::mat4_cast( ( m_CameraQuaternion));
+	m_View = glm::mat4_cast((m_CameraQuaternion));
 	m_View = glm::translate(m_View, -pos);
 	CalculateInverseONB();
+
+	//glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
+	//glm::vec3 cameraUp = glm::vec3(0.f, 1.0f, 0.f);
+	//
+	//m_View = glm::lookAt(m_Position, m_Position + cameraFront, cameraUp);
+	//CalculateInverseONB();
 }
 
-glm::mat4x4& Camera::GetONB()
-{
-	return m_ViewProjMatrix;
-}
+
 
 void Camera::UpdateCamera()
 {
@@ -170,7 +173,7 @@ void Camera::UpdateCamera()
 
 		auto worldPos = m_Position;
 		auto look = getForward();
-		std::cout << "Update matrix\n";
+		std::cout << worldPos.x << " " << worldPos.y << " " << worldPos.z << std::endl;
 
 		CalcViewMatrix((glm::lookAt(worldPos, worldPos + look, glm::vec3{ 0,1,0 })), worldPos);
 		m_UpdateNeeded = false;
