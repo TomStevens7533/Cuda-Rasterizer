@@ -1,7 +1,11 @@
 #pragma once
 #include "ext/matrix_transform.hpp"
 
-struct Triangle
+struct Input_Triangle
+{
+	glm::vec3 vertices[3];
+};
+struct Output_Triangle
 {
 	glm::vec3 vertices[3];
 };

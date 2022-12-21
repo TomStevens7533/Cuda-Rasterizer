@@ -11,7 +11,7 @@
 #include <thrust/device_ptr.h>
 
 __device__ int* depthBufferLock;
-__device__ Triangle* trDeviceArray;
+__device__ Input_Triangle* trDeviceArray;
 __device__ glm::vec3* framebuffer;
 fragment* depthbuffer;
 
@@ -40,7 +40,7 @@ glm::vec2 ConvertToScreenspace(const glm::vec3 ndcPos, glm::vec2 resolution) {
     return screenspacePoint;   
 }
 //Find bounding box
- __device__ void getBoundingBoxForTriangle(Triangle tri, glm::vec3& minpoint, glm::vec3& maxpoint) {
+ __device__ void getBoundingBoxForTriangle(Output_Triangle tri, glm::vec3& minpoint, glm::vec3& maxpoint) {
     minpoint = glm::vec3(min(min(tri.vertices[0].x, tri.vertices[1].x), tri.vertices[2].x),
         min(min(tri.vertices[0].y, tri.vertices[1].y), tri.vertices[2].y),
         min(min(tri.vertices[0].z, tri.vertices[1].z), tri.vertices[2].z));
@@ -49,14 +49,14 @@ glm::vec2 ConvertToScreenspace(const glm::vec3 ndcPos, glm::vec2 resolution) {
         max(max(tri.vertices[0].y, tri.vertices[1].y), tri.vertices[2].y),
         max(max(tri.vertices[0].z, tri.vertices[1].z), tri.vertices[2].z));
 }
-__host__ __device__ float calculateSignedArea(Triangle tri) {
+__host__ __device__ float calculateSignedArea(Input_Triangle tri) {
     return 0.5 * ((tri.vertices[2].x - tri.vertices[0].x) * (tri.vertices[1].y - tri.vertices[0].y)
         - (tri.vertices[1].x - tri.vertices[0].x) * (tri.vertices[2].y - tri.vertices[0].y));
 }
 __device__ float Cross(glm::vec2 lhs, glm::vec2 rhs) {
     return lhs.x * rhs.y - lhs.y * rhs.x;
 }
-__device__ bool IsPixelInTriangle(Triangle tri, const glm::vec2 point, float* pWeight, glm::vec2 resolution) {
+__device__ bool IsPixelInTriangle(Output_Triangle tri, const glm::vec2 point, float* pWeight, glm::vec2 resolution) {
 
     glm::vec2 ScreenspaceA = glm::vec2{ ((tri.vertices[0].x + 1) * 0.5f) * resolution.x ,  ((1 - tri.vertices[0].y) * 0.5f) * resolution.y };
     glm::vec2 ScreenspaceB = glm::vec2{ ((tri.vertices[1].x + 1) * 0.5f) * resolution.x,  ((1 - tri.vertices[1].y) * 0.5f) * resolution.y };
@@ -125,13 +125,18 @@ void sendImageToPBO(uchar4* PBOpos, glm::vec2 resolution, glm::vec3* image) {
     }
 }
 __global__
-void RasterizeKernel(Triangle* primitives, int triangleSize, glm::vec2 resolution, fragment* depthBuffer) {
+void RasterizeKernel(Input_Triangle* primitives, int triangleSize, glm::vec2 resolution, fragment* depthBuffer, glm::mat4x4 worldviewprojMat) {
     int triangleIdx = (blockIdx.x * blockDim.x) + threadIdx.x;
     if (triangleIdx < triangleSize) {
-        Triangle currTriangle = primitives[triangleIdx];
+        Input_Triangle currTriangle = primitives[triangleIdx];
+        Output_Triangle outputTriangle;
+        outputTriangle.vertices[0] = worldviewprojMat * glm::vec4(currTriangle.vertices[0], 1.f);
+        outputTriangle.vertices[1] = worldviewprojMat * glm::vec4(currTriangle.vertices[1], 1.f);
+        outputTriangle.vertices[2] = worldviewprojMat * glm::vec4(currTriangle.vertices[2], 1.f);
+
 
         glm::vec3 Min, Max;
-        getBoundingBoxForTriangle(currTriangle, Min, Max);
+        getBoundingBoxForTriangle(outputTriangle, Min, Max);
         float pixelWidth = 1.0f / (float)resolution.x;
         float pixelHeight = 1.0f / (float)resolution.y;
         float weights[3]{};
@@ -146,7 +151,7 @@ void RasterizeKernel(Triangle* primitives, int triangleSize, glm::vec2 resolutio
 
                fragment frag;
                frag.isEmpty = false;
-               if (IsPixelInTriangle(currTriangle, pixelPos,weights, resolution)) { //In in triangle
+               if (IsPixelInTriangle(outputTriangle, pixelPos,weights, resolution)) { //In in triangle
 
                    int pixelIdx = i + (j * resolution.x);
 
@@ -220,7 +225,7 @@ void kernelCleanup()
 }
 
 
-void cudaRasterizeCore(uchar4* PBOpos, glm::vec2 resolution,const Triangle* TrArray, int TriangleSize) {
+void cudaRasterizeCore(uchar4* PBOpos, glm::vec2 resolution,const Input_Triangle* TrArray, int TriangleSize, glm::mat4 worldviewprojMat) {
     //Init buffers
     //set up framebuffer
     checkCUDAError("Setup failed");
@@ -229,8 +234,8 @@ void cudaRasterizeCore(uchar4* PBOpos, glm::vec2 resolution,const Triangle* TrAr
     trDeviceArray = NULL;
     cudaError_t err;
     // Allocate Unified Memory – accessible from CPU or GPU
-    err = cudaMallocManaged((void**)&trDeviceArray, TriangleSize * sizeof(Triangle));
-    err = cudaMemcpy(trDeviceArray, TrArray, TriangleSize * sizeof(Triangle), cudaMemcpyHostToDevice);
+    err = cudaMallocManaged((void**)&trDeviceArray, TriangleSize * sizeof(Input_Triangle));
+    err = cudaMemcpy(trDeviceArray, TrArray, TriangleSize * sizeof(Input_Triangle), cudaMemcpyHostToDevice);
     checkCUDAError("Copying Triangle data failed");
 
     // set up thread configuration
@@ -238,7 +243,7 @@ void cudaRasterizeCore(uchar4* PBOpos, glm::vec2 resolution,const Triangle* TrAr
     dim3 threadsPerBlock(tileSize, tileSize);
     dim3 fullBlocksPerGrid((int)ceil(float(resolution.x) / float(tileSize)), (int)ceil(float(resolution.y) / float(tileSize)));
 
-    RasterizeKernel <<<fullBlocksPerGrid, threadsPerBlock>>>(trDeviceArray, TriangleSize, resolution, depthbuffer);
+    RasterizeKernel <<<fullBlocksPerGrid, threadsPerBlock>>>(trDeviceArray, TriangleSize, resolution, depthbuffer, worldviewprojMat);
     cudaDeviceSynchronize();
 
     checkCUDAError("Rasterization failed");
