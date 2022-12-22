@@ -14,7 +14,7 @@ __device__ int* depthBufferLock;
 __device__ Input_Triangle* trDeviceArray;
 __device__ glm::vec3* framebuffer;
 fragment* depthbuffer;
-cudaMat4* MV;
+glm::mat4x4* MV;
 
 void checkCUDAError(const char* msg) {
     cudaError_t err = cudaGetLastError();
@@ -58,6 +58,7 @@ __device__ float Cross(glm::vec2 lhs, glm::vec2 rhs) {
     return lhs.x * rhs.y - lhs.y * rhs.x;
 }
 __device__ bool IsPixelInTriangle(Output_Triangle tri, const glm::vec2 point, float* pWeight, glm::vec2 resolution) {
+    //Maybe positive values get passed this too
 
     glm::vec2 ScreenspaceA = glm::vec2{ ((tri.vertices[0].x + 1) * 0.5f) * resolution.x ,  ((1 - tri.vertices[0].y) * 0.5f) * resolution.y };
     glm::vec2 ScreenspaceB = glm::vec2{ ((tri.vertices[1].x + 1) * 0.5f) * resolution.x,  ((1 - tri.vertices[1].y) * 0.5f) * resolution.y };
@@ -125,40 +126,27 @@ void sendImageToPBO(uchar4* PBOpos, glm::vec2 resolution, glm::vec3* image) {
         PBOpos[index].z = color.z;
     }
 }
-cudaMat4 glmMat4ToCudaMat4(glm::mat4 a) {
-    //swap from glm column major to cuda row major
-    cudaMat4 m; a = glm::transpose(a);
-    m.x = a[0];
-    m.y = a[1];
-    m.z = a[2];
-    m.w = a[3];
-    return m;
-}
-__host__ __device__ glm::vec4 multiplyMV4(cudaMat4 m, glm::vec4 v) {
-    glm::vec4 r(1, 1, 1, 1);
-    r.x = (m.x.x * v.x) + (m.x.y * v.y) + (m.x.z * v.z) + (m.x.w * v.w);
-    r.y = (m.y.x * v.x) + (m.y.y * v.y) + (m.y.z * v.z) + (m.y.w * v.w);
-    r.z = (m.z.x * v.x) + (m.z.y * v.y) + (m.z.z * v.z) + (m.z.w * v.w);
-    r.w = (m.w.x * v.x) + (m.w.y * v.y) + (m.w.z * v.z) + (m.w.w * v.w);
-    return r;
-}
 
 __global__
-void RasterizeKernel(Input_Triangle* primitives, int triangleSize, glm::vec2 resolution, fragment* depthBuffer, cudaMat4* worldviewprojMat) {
+void RasterizeKernel(Input_Triangle* primitives, int triangleSize, glm::vec2 resolution, fragment* depthBuffer, glm::mat4x4* worldviewprojMat) {
     int triangleIdx = (blockIdx.x * blockDim.x) + threadIdx.x;
     if (triangleIdx < triangleSize) {
         Input_Triangle currTriangle = primitives[triangleIdx];
         Output_Triangle outputTriangle;
 
-        //To viewspace
-        glm::vec4 viewSpaceP0 = multiplyMV4(*worldviewprojMat , glm::vec4(currTriangle.vertices[0], 1.f));
-        glm::vec4 viewSpaceP1=  multiplyMV4(*worldviewprojMat , glm::vec4(currTriangle.vertices[1], 1.f));
-        glm::vec4 viewSpaceP3 = multiplyMV4(*worldviewprojMat , glm::vec4(currTriangle.vertices[2], 1.f));
+        //Transform vertices
+        for (size_t i = 0; i < 3; i++)
+        {
+            //Convert to viewspace
+            glm::vec4 viewSpaceP0 = (*worldviewprojMat * glm::vec4(currTriangle.vertices[i], 1.f));
+            //Convert to NDC coordinates
+            glm::vec4 NDC = glm::vec4(viewSpaceP0.x / viewSpaceP0.w, viewSpaceP0.y / viewSpaceP0.w, viewSpaceP0.z / viewSpaceP0.w, viewSpaceP0.w);
+            
+            if (NDC.x > 1 || NDC.x < -1 || NDC.y > 1 || NDC.y < -1)
+                return;
 
-        //To NDC 
-        outputTriangle.vertices[0] = glm::vec4(viewSpaceP0.x / viewSpaceP0.z, viewSpaceP0.y / viewSpaceP0.z, -viewSpaceP0.z, viewSpaceP0.w);
-        outputTriangle.vertices[1] = glm::vec4(viewSpaceP1.x / viewSpaceP1.z, viewSpaceP1.y / viewSpaceP1.z, -viewSpaceP1.z, viewSpaceP1.w);
-        outputTriangle.vertices[2] = glm::vec4(viewSpaceP3.x / viewSpaceP3.z, viewSpaceP3.y / viewSpaceP3.z, -viewSpaceP3.z, viewSpaceP3.w);
+             outputTriangle.vertices[i] = NDC;
+        }
 
 
         glm::vec3 Min, Max;
@@ -181,22 +169,25 @@ void RasterizeKernel(Input_Triangle* primitives, int triangleSize, glm::vec2 res
                frag.isEmpty = false;
                if (IsPixelInTriangle(outputTriangle, pixelPos,weights, resolution)) { //In in triangle
 
+                   float ZBufferValue = 1 / (((1 / outputTriangle.vertices[0].z) * weights[1]) + ((1 / outputTriangle.vertices[1].z) * weights[2]) + ((1 / outputTriangle.vertices[2].z) * weights[0]));
+                   float interpolatedW = 1 / (((1 / outputTriangle.vertices[0].w) * weights[1]) + ((1 / outputTriangle.vertices[1].w) * weights[2]) + ((1 / outputTriangle.vertices[2].w) * weights[0]));
                    int pixelIdx = i + (j * resolution.x);
 
-                   bool shouldWait = true;
 
-                   frag.color = glm::vec3{ 255.f, 0.f, 0.f };
-                   depthBuffer[pixelIdx] = frag;
-                 
+                   if (ZBufferValue > 0 && ZBufferValue < 1) { //Depth test | is interpolated value inside [0,1] range
+                       fragment previousDepth = depthBuffer[pixelIdx];
+                       if (interpolatedW < previousDepth.depth) {
+                           bool shouldWait = true;
+                           frag.color = glm::vec3{ 255.f, 0.f, 0.f };
+                           frag.depth = interpolatedW;
+                           depthBuffer[pixelIdx] = frag;
+                       }
 
+                  
+                       
 
+                   }
                }
-               else {
-               }
-               //if (!isBarycentricCoordInBounds(pixelBarycentricPos))
-               //    continue;
-
-               //Pixel is InTriangle
 
             }
         }
@@ -241,7 +232,7 @@ void InitializeBuffers(glm::vec2 resolution) {
     initiateArray << <dim3(ceil((float)depthBufferLockSize / ((float)512))), dim3(512) >> > (depthBufferLock, 0, depthBufferLockSize);
     checkCUDAError("Init depthbufferLock failed");
 
-    MV = new cudaMat4;
+    MV = new glm::mat4x4;
 
 }
 
@@ -273,6 +264,17 @@ __global__ void clearDepthBuffer(glm::vec2 resolution, fragment* buffer, fragmen
     }
 }
 
+
+void ClearImage(glm::vec2 resolution)
+{
+    // set up thread configuration
+    int tileSize = 8;
+    dim3 threadsPerBlock(tileSize, tileSize);
+    dim3 fullBlocksPerGrid((int)ceil(float(resolution.x) / float(tileSize)), (int)ceil(float(resolution.y) / float(tileSize)));
+
+    clearImage << <fullBlocksPerGrid, threadsPerBlock >> > (resolution, framebuffer, glm::vec3(0, 0, 0));
+
+}
 void cudaRasterizeCore(uchar4* PBOpos, glm::vec2 resolution,const Input_Triangle* TrArray, int TriangleSize, glm::mat4 worldviewprojMat) {
     //Init buffers
     //set up framebuffer
@@ -285,10 +287,10 @@ void cudaRasterizeCore(uchar4* PBOpos, glm::vec2 resolution,const Input_Triangle
     trDeviceArray = NULL;
 
 
-    cudaMat4* dev_MVtransform;
-    *MV = glmMat4ToCudaMat4(worldviewprojMat);
-    cudaMalloc((void**)&dev_MVtransform, sizeof(cudaMat4));
-    cudaMemcpy(dev_MVtransform, MV, sizeof(cudaMat4), cudaMemcpyHostToDevice);
+    glm::mat4x4* dev_MVtransform;
+    *MV = worldviewprojMat;
+    cudaMalloc((void**)&dev_MVtransform, sizeof(glm::mat4x4));
+    cudaMemcpy(dev_MVtransform, MV, sizeof(glm::mat4x4), cudaMemcpyHostToDevice);
     // Allocate Unified Memory – accessible from CPU or GPU
     cudaError_t err = cudaMallocManaged((void**)&trDeviceArray, TriangleSize * sizeof(Input_Triangle));
     err = cudaMemcpy(trDeviceArray, TrArray, TriangleSize * sizeof(Input_Triangle), cudaMemcpyHostToDevice);
@@ -304,8 +306,8 @@ void cudaRasterizeCore(uchar4* PBOpos, glm::vec2 resolution,const Input_Triangle
     frag.normal = glm::vec3(0, 0, 0);
     frag.position = glm::vec3(0, 0, -10000);
     frag.cameraSpacePosition = glm::vec3(0, 0, -10000);
+    frag.depth = 100;
     frag.isEmpty = true;
-    clearImage << <fullBlocksPerGrid, threadsPerBlock >> > (resolution, framebuffer, glm::vec3(0, 0, 0));
     clearDepthBuffer << <fullBlocksPerGrid, threadsPerBlock >> > (resolution, depthbuffer, frag);
     cudaDeviceSynchronize();
     RasterizeKernel <<<fullBlocksPerGrid, threadsPerBlock>>>(trDeviceArray, TriangleSize, resolution, depthbuffer, dev_MVtransform);

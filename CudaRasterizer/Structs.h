@@ -36,6 +36,7 @@ struct fragment {
 	glm::vec3 normal;
 	glm::vec3 position;
 	glm::vec3 cameraSpacePosition;
+	float depth;
 	bool isEmpty;
 };
 

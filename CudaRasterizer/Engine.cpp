@@ -58,6 +58,7 @@ void Engine::mainLoop()
 
 		m_Camera.UpdateCamera();
 
+		ClearImage(glm::vec2{ width, height });
 		//Start scene
 		SceneData scData;
 		scData.PBOpos = dptr;

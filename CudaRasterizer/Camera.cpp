@@ -40,9 +40,7 @@ glm::quat Camera::RotateDegrees(float angleRadians, const glm::vec3& axis)
 
 void Camera::CalculateInverseONB()
 {
-
-	m_ViewProjMatrix = m_Proj * glm::inverse(m_View);
-
+	m_ViewProjMatrix = m_Proj * (m_View);
 
 }
 void Camera::CalculateProjectionMatrix(float fov, float aspectRatio)
@@ -58,7 +56,7 @@ void Camera::CalcViewMatrix(glm::mat4x4 view, glm::vec3 pos)
 	m_CameraQuaternion = m_CameraQuaternionYaw * m_CameraQuaternionPitch;
 	m_CameraQuaternion = glm::quat(m_CameraQuaternion.x, m_CameraQuaternion.y, m_CameraQuaternion.z, m_CameraQuaternion.w);
 	m_View = glm::mat4_cast((m_CameraQuaternion));
-	m_View = glm::translate(m_View, -pos);
+	m_View = glm::translate(m_View, pos);
 	CalculateInverseONB();
 }
 
