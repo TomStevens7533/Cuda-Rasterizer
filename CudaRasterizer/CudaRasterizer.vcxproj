@@ -32,6 +32,8 @@
     <ClInclude Include="CudaKernel.h" />
     <ClInclude Include="Input.h" />
     <ClInclude Include="KeyMouseCodes.h" />
+    <ClInclude Include="math\ERenderer.h" />
+    <ClInclude Include="math\ERGBColor.h" />
     <ClInclude Include="obj.h" />
     <ClInclude Include="ObjLoader.h" />
     <ClInclude Include="Renderer.h" />

@@ -156,15 +156,18 @@ void RasterizeKernel(Input_Triangle* primitives, int triangleSize, glm::vec2 res
         glm::vec4 viewSpaceP3 = multiplyMV4(*worldviewprojMat , glm::vec4(currTriangle.vertices[2], 1.f));
 
         //To NDC 
-        outputTriangle.vertices[0] = glm::vec4(viewSpaceP0.x / viewSpaceP0.w, viewSpaceP0.y / viewSpaceP0.w, viewSpaceP0.z / viewSpaceP0.w, viewSpaceP0.w);
-        outputTriangle.vertices[1] = glm::vec4(viewSpaceP1.x / viewSpaceP1.w, viewSpaceP1.y / viewSpaceP1.w, viewSpaceP1.z / viewSpaceP1.w, viewSpaceP1.w);
-        outputTriangle.vertices[2] = glm::vec4(viewSpaceP3.x / viewSpaceP3.w, viewSpaceP3.y / viewSpaceP3.w, viewSpaceP3.z / viewSpaceP3.w, viewSpaceP3.w);
+        outputTriangle.vertices[0] = glm::vec4(viewSpaceP0.x / viewSpaceP0.z, viewSpaceP0.y / viewSpaceP0.z, -viewSpaceP0.z, viewSpaceP0.w);
+        outputTriangle.vertices[1] = glm::vec4(viewSpaceP1.x / viewSpaceP1.z, viewSpaceP1.y / viewSpaceP1.z, -viewSpaceP1.z, viewSpaceP1.w);
+        outputTriangle.vertices[2] = glm::vec4(viewSpaceP3.x / viewSpaceP3.z, viewSpaceP3.y / viewSpaceP3.z, -viewSpaceP3.z, viewSpaceP3.w);
+
 
         glm::vec3 Min, Max;
         getBoundingBoxForTriangle(outputTriangle, Min, Max);
         float pixelWidth = 1.0f / (float)resolution.x;
         float pixelHeight = 1.0f / (float)resolution.y;
         float weights[3]{};
+
+
 
         //TODO Add Bounding Box
         for (int i = 0; i < resolution.x; i += 1)
