@@ -102,13 +102,13 @@ void Camera::UpdateCamera()
 
 		m_UpdateNeeded = true;
 	}
-	if (Input::IsKeyPressed(KEY_SPACE)) {
+	if (Input::IsKeyPressed(KEY_C)) {
 		newPos += upVec * ((m_CameraMovementSpeed * multiplier));
 		//EU_CORE_INFO("NEW POS: X {0}, Y {1}, Z {2}", newPos.x, newPos.y, newPos.z);
 
 		m_UpdateNeeded = true;
 	}
-	if (Input::IsKeyPressed(KEY_C)) {
+	if (Input::IsKeyPressed(KEY_SPACE)) {
 		newPos -= upVec * ((m_CameraMovementSpeed * multiplier));
 		//EU_CORE_INFO("NEW POS: X {0}, Y {1}, Z {2}", newPos.x, newPos.y, newPos.z);
 

@@ -142,8 +142,8 @@ void RasterizeKernel(Input_Triangle* primitives, int triangleSize, glm::vec2 res
             //Convert to NDC coordinates
             glm::vec4 NDC = glm::vec4(viewSpaceP0.x / viewSpaceP0.w, viewSpaceP0.y / viewSpaceP0.w, viewSpaceP0.z / viewSpaceP0.w, viewSpaceP0.w);
             
-            if (NDC.x > 1 || NDC.x < -1 || NDC.y > 1 || NDC.y < -1)
-                return;
+            //if (NDC.x > 1 || NDC.x < -1 || NDC.y > 1 || NDC.y < -1)
+                //return;
 
              outputTriangle.vertices[i] = NDC;
         }
