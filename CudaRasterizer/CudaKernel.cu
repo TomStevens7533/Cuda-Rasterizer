@@ -11,7 +11,13 @@
 #include <thrust/device_ptr.h>
 
 __device__ int* depthBufferLock;
-__device__ Input_Triangle* trDeviceArray;
+
+__device__  int* dev_pIndexBuffer;
+__device__  glm::vec3* dev_pVertexBuffer;
+__device__  glm::vec4* dev_pOutputVertexBuffer;
+
+__device__  Input_Triangle* dev_pTriangleBuffer;
+
 __device__ glm::vec3* framebuffer;
 fragment* depthbuffer;
 glm::mat4x4* MV;
@@ -23,7 +29,16 @@ void checkCUDAError(const char* msg) {
             exit(EXIT_FAILURE); 
     }
 }
+void kernelCleanup()
+{
+    cudaFree(dev_pTriangleBuffer);
+    cudaFree(dev_pIndexBuffer);
+    cudaFree(dev_pVertexBuffer);
 
+    cudaFree(framebuffer);
+    cudaFree(depthbuffer);
+    cudaFree(depthBufferLock);
+}
 //fast initializor for int array
 __global__ void initiateArray(int* array, int val, int num)
 {
@@ -34,12 +49,6 @@ __global__ void initiateArray(int* array, int val, int num)
     }
 }
 
-//How to call only other device fucntions+
-glm::vec2 ConvertToScreenspace(const glm::vec3 ndcPos, glm::vec2 resolution) {
-   
-    glm::vec2 screenspacePoint = glm::vec2{ ((ndcPos.x + 1) * 0.5f),  ((1 - ndcPos.y) * 0.5f) * resolution.y };
-    return screenspacePoint;   
-}
 //Find bounding box
  __device__ void getBoundingBoxForTriangle(Output_Triangle tri, glm::vec3& minpoint, glm::vec3& maxpoint) {
     minpoint = glm::vec3(min(min(tri.vertices[0].x, tri.vertices[1].x), tri.vertices[2].x),
@@ -137,10 +146,9 @@ void RasterizeKernel(Input_Triangle* primitives, int triangleSize, glm::vec2 res
         //Transform vertices
         for (size_t i = 0; i < 3; i++)
         {
-            //Convert to viewspace
-            glm::vec4 viewSpaceP0 = (*worldviewprojMat * glm::vec4(currTriangle.vertices[i], 1.f));
+            
             //Convert to NDC coordinates
-            glm::vec4 NDC = glm::vec4(viewSpaceP0.x / viewSpaceP0.w, viewSpaceP0.y / viewSpaceP0.w, viewSpaceP0.z / viewSpaceP0.w, viewSpaceP0.w);
+            glm::vec4 NDC = glm::vec4(currTriangle.vertices[i].x / currTriangle.vertices[i].w, currTriangle.vertices[i].y / currTriangle.vertices[i].w, currTriangle.vertices[i].z / currTriangle.vertices[i].w, currTriangle.vertices[i].w);
             
             //if (NDC.x > 1 || NDC.x < -1 || NDC.y > 1 || NDC.y < -1)
                 //return;
@@ -158,9 +166,9 @@ void RasterizeKernel(Input_Triangle* primitives, int triangleSize, glm::vec2 res
 
 
         //TODO Add Bounding Box
-        for (int i = 0; i < resolution.x; i += 1)
+        for (int i =0; i < (resolution.x) ; i += 1)
         {
-            for (int j = 0; j < resolution.y; j += 1)
+            for (int j = 0; j < (resolution.y); j += 1)
             {
               
                glm::vec2 pixelPos = glm::vec2(i, j);
@@ -235,13 +243,40 @@ void InitializeBuffers(glm::vec2 resolution) {
     MV = new glm::mat4x4;
 
 }
+__global__ void vertexShaderKernel(glm::vec3* pDev_vertexBuffer, glm::vec4* pDev_OutputvertexBuffer, int vertexAmount, glm::mat4x4* MV) {
+    int index = (blockIdx.x * blockDim.x) + threadIdx.x;
+    //Safety check
+    if (index < vertexAmount) {
+        //Convert to viewspace
+        glm::vec4 viewSpaceP = (*MV * glm::vec4(pDev_vertexBuffer[index].x, pDev_vertexBuffer[index].y, pDev_vertexBuffer[index].z, 1.f));
 
-void kernelCleanup()
-{
-    cudaFree(trDeviceArray);
-    cudaFree(framebuffer);
-    cudaFree(depthbuffer);
-    cudaFree(depthBufferLock);
+
+        pDev_OutputvertexBuffer[index] = viewSpaceP;
+    }
+}
+
+__global__ void primitiveAssemblyKernel(glm::vec4* pDev_VertexBufer, int vertexAmount, int* pDev_IndexBuffer, int indexAmount, Input_Triangle* pDev_TriangleInput) {
+    int index = (blockIdx.x * blockDim.x) + threadIdx.x;
+    int primitivesCount = indexAmount / 3;
+
+
+    if (index < primitivesCount) {
+
+        Input_Triangle triangle;
+        int f1, f2, f3;
+        f1 = pDev_IndexBuffer[(index * 3)];
+        f2 = pDev_IndexBuffer[(index * 3)+1];
+        f3 = pDev_IndexBuffer[(index * 3)+2];
+
+
+
+        triangle.vertices[0] = pDev_VertexBufer[f1];
+        triangle.vertices[1] = pDev_VertexBufer[f2];
+        triangle.vertices[2] = pDev_VertexBufer[f3];
+
+       pDev_TriangleInput[index] = triangle;
+
+    }
 }
 
 //Kernel that clears a given pixel buffer with a given color
@@ -263,8 +298,6 @@ __global__ void clearDepthBuffer(glm::vec2 resolution, fragment* buffer, fragmen
         buffer[index] = f;
     }
 }
-
-
 void ClearImage(glm::vec2 resolution)
 {
     // set up thread configuration
@@ -275,32 +308,52 @@ void ClearImage(glm::vec2 resolution)
     clearImage << <fullBlocksPerGrid, threadsPerBlock >> > (resolution, framebuffer, glm::vec3(0, 0, 0));
 
 }
-void cudaRasterizeCore(uchar4* PBOpos, glm::vec2 resolution,const Input_Triangle* TrArray, int TriangleSize, glm::mat4 worldviewprojMat) {
+
+void cudaRasterizeCore(uchar4* PBOpos, glm::vec2 resolution, const glm::vec3* pVertexBuffer, int vertexAnmount, const int* pIndexBuffer, int indexAmount, glm::mat4 worldviewprojMat) {
     //Init buffers
     //set up framebuffer
-   
     checkCUDAError("Setup failed");
 
     //Move Host memory To Device; Host == CPU && Device == GPU
-   
+    dev_pTriangleBuffer = NULL;
 
-    trDeviceArray = NULL;
-
-
+    //WorldViewProjMatrix
     glm::mat4x4* dev_MVtransform;
     *MV = worldviewprojMat;
-    cudaMalloc((void**)&dev_MVtransform, sizeof(glm::mat4x4));
-    cudaMemcpy(dev_MVtransform, MV, sizeof(glm::mat4x4), cudaMemcpyHostToDevice);
-    // Allocate Unified Memory – accessible from CPU or GPU
-    cudaError_t err = cudaMallocManaged((void**)&trDeviceArray, TriangleSize * sizeof(Input_Triangle));
-    err = cudaMemcpy(trDeviceArray, TrArray, TriangleSize * sizeof(Input_Triangle), cudaMemcpyHostToDevice);
-    checkCUDAError("Copying Triangle data failed");
+    cudaError_t err = cudaMalloc((void**)&dev_MVtransform, sizeof(glm::mat4x4));
+    err = cudaMemcpy(dev_MVtransform, MV, sizeof(glm::mat4x4), cudaMemcpyHostToDevice);
+
+    //Allocate Triangle Buffer depending on Indices amount
+    dev_pTriangleBuffer = NULL;
+    int primitiveAmount = (indexAmount / 3);
+    err = cudaMalloc((void**)&dev_pTriangleBuffer, primitiveAmount * sizeof(Input_Triangle));
+    checkCUDAError("Allocating triangle data failed!");
+    //Allocate vetexbuffer data in Device memory and copy from CPU memory to Device Memory
+    dev_pVertexBuffer = NULL;
+    err = cudaMalloc((void**)&dev_pVertexBuffer, vertexAnmount * sizeof(glm::vec3));
+    checkCUDAError("Allocating vertex data on Device failed!");
+    err = cudaMemcpy(dev_pVertexBuffer, pVertexBuffer, vertexAnmount * sizeof(glm::vec3), cudaMemcpyHostToDevice);
+    checkCUDAError("Copying vertex data to Device failed!");
+
+    dev_pOutputVertexBuffer = NULL;
+    err = cudaMalloc((void**)&dev_pOutputVertexBuffer, vertexAnmount * sizeof(glm::vec4));
+    checkCUDAError("Allocating output vertex data on Device failed!");
+
+    //Allocate indexbuffer data in Device memory and copy from CPU memory to Device Memory
+    dev_pIndexBuffer = NULL;
+    err = cudaMalloc((void**)&dev_pIndexBuffer, indexAmount * sizeof(int));
+    checkCUDAError("Allocating index data on Device failed!");
+    err = cudaMemcpy(dev_pIndexBuffer, pIndexBuffer, indexAmount * sizeof(int), cudaMemcpyHostToDevice);
+    checkCUDAError("Copying Index data to Device failed!");
+
+
 
     // set up thread configuration
     int tileSize = 8;
     dim3 threadsPerBlock(tileSize, tileSize);
     dim3 fullBlocksPerGrid((int)ceil(float(resolution.x) / float(tileSize)), (int)ceil(float(resolution.y) / float(tileSize)));
 
+    //Clear depth buffer
     fragment frag;
     frag.color = glm::vec3(0, 0, 0);
     frag.normal = glm::vec3(0, 0, 0);
@@ -310,7 +363,21 @@ void cudaRasterizeCore(uchar4* PBOpos, glm::vec2 resolution,const Input_Triangle
     frag.isEmpty = true;
     clearDepthBuffer << <fullBlocksPerGrid, threadsPerBlock >> > (resolution, depthbuffer, frag);
     cudaDeviceSynchronize();
-    RasterizeKernel <<<fullBlocksPerGrid, threadsPerBlock>>>(trDeviceArray, TriangleSize, resolution, depthbuffer, dev_MVtransform);
+
+    //Vertex shader
+    tileSize = 16;
+    int primitiveBlocks = ceil(((float)vertexAnmount) / ((float)tileSize));
+    vertexShaderKernel << <primitiveBlocks, tileSize >> > (dev_pVertexBuffer, dev_pOutputVertexBuffer, vertexAnmount, dev_MVtransform);
+    cudaDeviceSynchronize();
+
+
+    //Primitive assmebly | creating the triangles
+    primitiveBlocks = ceil(((float)indexAmount / 3) / ((float)tileSize));
+    primitiveAssemblyKernel << <primitiveBlocks, tileSize >> > (dev_pOutputVertexBuffer, vertexAnmount, dev_pIndexBuffer, indexAmount, dev_pTriangleBuffer);
+    cudaDeviceSynchronize();
+
+
+    RasterizeKernel <<<fullBlocksPerGrid, threadsPerBlock>>>(dev_pTriangleBuffer, primitiveAmount, resolution, depthbuffer, dev_MVtransform);
     cudaDeviceSynchronize();
 
     checkCUDAError("Rasterization failed");
@@ -327,6 +394,13 @@ void cudaRasterizeCore(uchar4* PBOpos, glm::vec2 resolution,const Input_Triangle
 
 
     cudaDeviceSynchronize();
+    cudaFree(dev_pOutputVertexBuffer);
+    cudaFree(dev_pTriangleBuffer);
+    cudaFree(dev_pVertexBuffer);
+    cudaFree(dev_pIndexBuffer);
+
+
+
 
 
 }

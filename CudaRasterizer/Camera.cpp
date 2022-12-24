@@ -185,7 +185,7 @@ glm::vec3 Camera::getLeft() const
 
 glm::vec3 Camera::getUp() const
 {
-	return glm::conjugate(m_CameraQuaternion) * glm::vec3(0.0f, 1.0f, 0.0f);
+	return glm::conjugate(m_CameraQuaternion) * glm::vec3(0.0f, -1.0f, 0.0f);
 }
 
 void Camera::RotateYaw(float angleRadians)
