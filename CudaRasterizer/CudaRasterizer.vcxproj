@@ -30,6 +30,7 @@
     <ClInclude Include="CudaKernel.h" />
     <ClInclude Include="Input.h" />
     <ClInclude Include="KeyMouseCodes.h" />
+    <ClInclude Include="RasterizeTools.h" />
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="Structs.h" />
     <ClInclude Include="utilities.h" />

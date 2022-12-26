@@ -82,8 +82,7 @@ void Engine::mainLoop()
 		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, 0);
 		m_Application.GetWindow().SwapWindow();
 
-
-		
+		//return;
 	}
 
 	

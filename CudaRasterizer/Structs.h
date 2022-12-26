@@ -7,9 +7,12 @@ struct Input_Triangle
 };
 struct Output_Triangle
 {
-	glm::vec4 vertices[3];
+	glm::vec3 vertices[3];
 };
-
+struct AABB {
+	glm::vec3 min;
+	glm::vec3 max;
+};
 struct cudaMat3 {
 	glm::vec3 x;
 	glm::vec3 y;
