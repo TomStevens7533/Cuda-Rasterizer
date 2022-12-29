@@ -4,10 +4,8 @@
 struct Input_Triangle
 {
 	glm::vec4 vertices[3];
-};
-struct Output_Triangle
-{
-	glm::vec3 vertices[3];
+	glm::vec4 NDC[3];
+	glm::vec3 Screenspace[3];
 };
 struct AABB {
 	glm::vec3 min;
