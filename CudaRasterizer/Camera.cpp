@@ -2,6 +2,7 @@
 #include "Input.h"
 #include "KeyMouseCodes.h"
 #include <iostream>
+#include "DeltaTime.h"
 
 
 
@@ -68,7 +69,7 @@ void Camera::UpdateCamera()
 	glm::vec3 upVec = glm::vec3(0.0f, 1.0f, 0.0f);
 	glm::vec3 forwardVec = getForward();
 	glm::vec3 rightVec = getLeft();
-
+	auto timeInstance = Time::GetInstance();
 
 	upVec = glm::cross(forwardVec, rightVec);
 
@@ -79,37 +80,37 @@ void Camera::UpdateCamera()
 	if (Input::IsKeyPressed(KEY_LEFT_ALT))
 		multiplier++;
 	if (Input::IsKeyPressed(KEY_D)) {
-		newPos -= rightVec * (m_CameraMovementSpeed * multiplier);
+		newPos -= rightVec * (m_CameraMovementSpeed * multiplier * timeInstance->GetDeltaTime());
 		//EU_CORE_INFO("NEW POS: X {0}, Y {1}, Z {2}", newPos.x, newPos.y, newPos.z);
 		m_UpdateNeeded = true;
 	}
 	if (Input::IsKeyPressed(KEY_A)) {
-		newPos += rightVec * ((m_CameraMovementSpeed * multiplier));
+		newPos += rightVec * ((m_CameraMovementSpeed * multiplier * timeInstance->GetDeltaTime()));
 		//EU_CORE_INFO("NEW POS: X {0}, Y {1}, Z {2}", newPos.x, newPos.y, newPos.z);
 
 		m_UpdateNeeded = true;
 	}
 	if (Input::IsKeyPressed(KEY_W)) {
-		newPos += forwardVec * ((m_CameraMovementSpeed * multiplier));
+		newPos += forwardVec * ((m_CameraMovementSpeed * multiplier * timeInstance->GetDeltaTime()));
 		//EU_CORE_INFO("NEW POS: X {0}, Y {1}, Z {2}", newPos.x, newPos.y, newPos.z);
 
 		m_UpdateNeeded = true;
 	}
 
 	if (Input::IsKeyPressed(KEY_S)) {
-		newPos -= forwardVec * ((m_CameraMovementSpeed * multiplier));
+		newPos -= forwardVec * ((m_CameraMovementSpeed * multiplier * timeInstance->GetDeltaTime()));
 		//EU_CORE_INFO("NEW POS: X {0}, Y {1}, Z {2}", newPos.x, newPos.y, newPos.z);
 
 		m_UpdateNeeded = true;
 	}
 	if (Input::IsKeyPressed(KEY_C)) {
-		newPos += upVec * ((m_CameraMovementSpeed * multiplier));
+		newPos += upVec * ((m_CameraMovementSpeed * multiplier * timeInstance->GetDeltaTime()));
 		//EU_CORE_INFO("NEW POS: X {0}, Y {1}, Z {2}", newPos.x, newPos.y, newPos.z);
 
 		m_UpdateNeeded = true;
 	}
 	if (Input::IsKeyPressed(KEY_SPACE)) {
-		newPos -= upVec * ((m_CameraMovementSpeed * multiplier));
+		newPos -= upVec * ((m_CameraMovementSpeed * multiplier * timeInstance->GetDeltaTime()));
 		//EU_CORE_INFO("NEW POS: X {0}, Y {1}, Z {2}", newPos.x, newPos.y, newPos.z);
 
 		m_UpdateNeeded = true;
@@ -135,7 +136,7 @@ void Camera::UpdateCamera()
 		m_OldScreenPos.y = y;
 
 		//TODO: Use time
-		m_ScreenPosOffset = m_ScreenPosOffset * (m_sensitivity);
+		m_ScreenPosOffset = (m_ScreenPosOffset * m_sensitivity) * timeInstance->GetDeltaTime();
 
 
 		m_CameraRot.y += m_ScreenPosOffset.x; //yaw rotate x
@@ -144,13 +145,17 @@ void Camera::UpdateCamera()
 
 
 
-		if (m_CameraRot.x > 89.0f)
+		if (m_CameraRot.x > 89.0f) {
 			m_CameraRot.x = 89.0f;
-		if (m_CameraRot.x < -89.0f)
+			return;
+		}
+		if (m_CameraRot.x < -89.0f) {
 			m_CameraRot.x = -89.0f;
+			return;
+		}
 
 		RotateYaw(m_ScreenPosOffset.x);
-		RotatePitch(m_ScreenPosOffset.y);
+		RotatePitch(-m_ScreenPosOffset.y);
 
 		m_UpdateNeeded = true;
 
@@ -175,7 +180,7 @@ void Camera::UpdateCamera()
 
 glm::vec3 Camera::getForward() const
 {
-	return glm::conjugate(m_CameraQuaternion) * glm::vec3(0.0f, 0.0f, -1.0f);
+	return glm::conjugate(m_CameraQuaternion) * glm::vec3(0.0f, 0.0f, 1.0f);
 }
 
 glm::vec3 Camera::getLeft() const

@@ -57,10 +57,9 @@ private:
 
 
 
-	float m_sensitivity = 3.f;
+	float m_sensitivity = 100.f;
 	//variables
-	float m_CameraMovementSpeed{ 0.1f };
-	float m_RotationSpeed{ 1.f };
+	float m_CameraMovementSpeed{ 25.f };
 
 
 };

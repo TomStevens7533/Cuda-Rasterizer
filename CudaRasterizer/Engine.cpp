@@ -1,5 +1,6 @@
 #include "Engine.h"
 #include "Renderer.h"
+#include "DeltaTime.h"
 
 
 Engine::Engine() : m_Application{width, height}, m_Camera{60}
@@ -42,6 +43,10 @@ void Engine::mainLoop()
 {
 	m_Application.Start();
 	while (m_Running) {
+
+		//Update time
+		auto timeInstance = Time::GetInstance();
+		timeInstance->Update();
 
 		//camera rotation, zoom control using mouse
 		double* mouseX = new double;
