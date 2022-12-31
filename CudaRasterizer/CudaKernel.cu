@@ -10,6 +10,7 @@
 #include <thrust/count.h>
 #include <thrust/device_ptr.h>
 #include "RasterizeTools.h"
+#include "DeviceStructs.h"
 
 struct Tile {
     int m_TriangleIndexes[1000]; //Indexes of triangles that are in this Tile
@@ -21,10 +22,15 @@ __device__ int* depthBufferLock;
 __device__  int* dev_pIndexBuffer = nullptr;
 __device__  glm::vec3* dev_pVertexBuffer = nullptr;
 __device__  glm::vec4* dev_pOutputVertexBuffer = nullptr;
-
 __device__  Input_Triangle* dev_pTriangleBuffer = nullptr;
-
 __device__ glm::vec3* framebuffer;
+
+//Lighting information
+__device__ __constant__ const float3 Dev_lightDirection{ 0.577f , -0.577f, -0.577f };
+__device__ __constant__ const float3 Dev_lightColor{ 3.f,3.f,3.f };
+__device__ __constant__ const float Dev_LightIntensity = 1.f;
+__device__ __constant__ const float Dev_PI = 3.141592654f;
+
 Tile* tileBuffer = NULL;
 int* dev_tileMutex = NULL;
 fragment* depthbuffer;
@@ -67,8 +73,8 @@ __global__ void initiateArray(int* array, int val, int num)
     }
 }
 __host__ __device__ float calculateSignedArea(Input_Triangle tri) {
-    return 0.5 * ((tri.vertices[2].x - tri.vertices[0].x) * (tri.vertices[1].y - tri.vertices[0].y)
-        - (tri.vertices[1].x - tri.vertices[0].x) * (tri.vertices[2].y - tri.vertices[0].y));
+    return 0.5 * ((tri.viewspaceCoords[2].x - tri.viewspaceCoords[0].x) * (tri.viewspaceCoords[1].y - tri.viewspaceCoords[0].y)
+        - (tri.viewspaceCoords[1].x - tri.viewspaceCoords[0].x) * (tri.viewspaceCoords[2].y - tri.viewspaceCoords[0].y));
 }
 __device__ float Cross(glm::vec2 lhs, glm::vec2 rhs) {
     return lhs.x * rhs.y - lhs.y * rhs.x;
@@ -76,9 +82,9 @@ __device__ float Cross(glm::vec2 lhs, glm::vec2 rhs) {
 __device__ bool IsPixelInTriangle(Input_Triangle tri, const glm::vec2 point, float* pWeight, glm::vec2 resolution) {
     //Maybe positive values get passed this too
 
-    glm::vec2 ScreenspaceA = glm::vec2{ ((tri.NDC[0].x + 1) * 0.5f) * resolution.x ,  ((1 - tri.NDC[0].y) * 0.5f) * resolution.y };
-    glm::vec2 ScreenspaceB = glm::vec2{ ((tri.NDC[1].x + 1) * 0.5f) * resolution.x,  ((1 -  tri.NDC[1].y) * 0.5f) * resolution.y };
-    glm::vec2 ScreenspaceC = glm::vec2{ ((tri.NDC[2].x + 1) * 0.5f) * resolution.x,  ((1 -  tri.NDC[2].y) * 0.5f) * resolution.y };
+    glm::vec2 ScreenspaceA = glm::vec2{ tri.Screenspace[0] };
+    glm::vec2 ScreenspaceB = glm::vec2{ tri.Screenspace[1] };
+    glm::vec2 ScreenspaceC = glm::vec2{ tri.Screenspace[2] };
 
     glm::vec2 edgeA = glm::vec2(ScreenspaceB - ScreenspaceA);
     glm::vec2 edgeB = glm::vec2(ScreenspaceC - ScreenspaceB);
@@ -269,7 +275,27 @@ void resetTiles(int numTiles, int stride_x, int stride_y, Tile* dev_tiles)
 //        }
 //    
 //}
+__device__
+float Cuda_dot(float3 a, float3 b)
+{
+    return a.x * b.x + a.y * b.y + a.z * b.z;
+}
 
+__device__
+glm::vec3 PixelShading(glm::vec2 pixePos, Input_Triangle* CurrTriangle) {
+    float3 normal;
+    normal.x = -CurrTriangle->Normal.x;
+    normal.y = CurrTriangle->Normal.y;
+    normal.z = -CurrTriangle->Normal.z;
+
+   float lambertCosine = Cuda_dot(normal, Dev_lightDirection);
+   glm::vec3 LambertColor = (CurrTriangle->Color * 1.f) / Dev_PI; //BRDF LAMBERT
+   if (lambertCosine >= 0) {
+       return glm::vec3{ Dev_lightColor.x,Dev_lightColor.y, Dev_lightColor.z } *LambertColor * lambertCosine;
+   }
+   return glm::vec3{ 0.f, 0.f, 0.f };
+
+}
 __global__
 void RasterizePixels(int pixelXoffset, int pixelYoffset, int numpixelsX, int numpixelsY,
     glm::vec2 resolution, int tileID, Tile* dev_tilesList,
@@ -306,7 +332,7 @@ void RasterizePixels(int pixelXoffset, int pixelYoffset, int numpixelsX, int num
                     if (interpolatedW < previousDepth.depth) {
                         bool shouldWait = true;
                         fragment frag;
-                        frag.color = glm::vec3{ 255.f, 0.f, 0.f };
+                        frag.color = PixelShading(glm::vec2{ _x, _y }, &currentTriangle);
                         frag.depth = interpolatedW;
                         dev_depthBuffer[index] = frag;
 
@@ -322,6 +348,8 @@ void RasterizePixels(int pixelXoffset, int pixelYoffset, int numpixelsX, int num
 }
 void RasterizeTiles(Input_Triangle* primitives, int triangleSize, glm::vec2 resolution, fragment* depthBuffer, int* dev_mutex) {
 
+    cudaDeviceSynchronize();
+
     //RESET TILES
     int stride_x = glm::floor(resolution.x / TILE_W_AMOUNT);
     int stride_y = glm::floor(resolution.y / TILE_H_AMOUNT);
@@ -332,6 +360,7 @@ void RasterizeTiles(Input_Triangle* primitives, int triangleSize, glm::vec2 reso
     dim3 blockCount1d_tiles(((numTiles - 1) / numThreadsPerBlock.x) + 1);
     resetTiles << <blockCount1d_tiles, numThreadsPerBlock >> > (numTiles, stride_x, stride_y, tileBuffer);
 
+    cudaDeviceSynchronize();
 
     dim3 blockCount1d_triangles(((triangleSize - 1) / numThreadsPerBlock.x) + 1);
     SortTrianglesInCorrectTile << <blockCount1d_triangles, numThreadsPerBlock >> > (primitives, triangleSize, resolution, stride_x, stride_y, dev_mutex, tileBuffer);
@@ -376,6 +405,7 @@ void RasterizeTiles(Input_Triangle* primitives, int triangleSize, glm::vec2 reso
         tileYcount++;
     }
     checkCUDAError("full rasterization failed");
+    cudaDeviceSynchronize();
 
     ////Debug in console
     //for (size_t h = 0; h < TILE_H_AMOUNT; h++)
@@ -490,7 +520,9 @@ __global__ void vertexShaderKernel(glm::vec3* pDev_vertexBuffer, glm::vec4* pDev
     }
 }
 
-__global__ void primitiveAssemblyKernel(glm::vec4* pDev_VertexBufer, int vertexAmount, int* pDev_IndexBuffer, int indexAmount, Input_Triangle* pDev_TriangleInput, glm::vec2 resolution) {
+__global__ void primitiveAssemblyKernel(glm::vec4* pDev_ViewSpaceVertexBufer, 
+    glm::vec3* pDev_WorldSpaceVertexBufer, int vertexAmount, int* pDev_IndexBuffer, int indexAmount, Input_Triangle* pDev_TriangleInput, glm::vec2 resolution)
+{
     int index = (blockIdx.x * blockDim.x) + threadIdx.x;
     int primitivesCount = indexAmount / 3;
 
@@ -503,19 +535,28 @@ __global__ void primitiveAssemblyKernel(glm::vec4* pDev_VertexBufer, int vertexA
         f2 = pDev_IndexBuffer[(index * 3)+1];
         f3 = pDev_IndexBuffer[(index * 3)+2];
 
-        triangle.vertices[0] = pDev_VertexBufer[f1];
-        triangle.vertices[1] = pDev_VertexBufer[f2];
-        triangle.vertices[2] = pDev_VertexBufer[f3];
+        triangle.viewspaceCoords[0] = pDev_ViewSpaceVertexBufer[f1];
+        triangle.viewspaceCoords[1] = pDev_ViewSpaceVertexBufer[f2];
+        triangle.viewspaceCoords[2] = pDev_ViewSpaceVertexBufer[f3];
+
+        triangle.worldSpaceCoords[0] = pDev_WorldSpaceVertexBufer[f1];
+        triangle.worldSpaceCoords[1] = pDev_WorldSpaceVertexBufer[f2];
+        triangle.worldSpaceCoords[2] = pDev_WorldSpaceVertexBufer[f3];
+
+        //Calculate triangle Normal
+        glm::vec3 edgeA = (triangle.worldSpaceCoords[1] - triangle.worldSpaceCoords[0]);
+        glm::vec3 edgeB = (triangle.worldSpaceCoords[2] - triangle.worldSpaceCoords[1]);
+        triangle.Normal = glm::normalize(glm::cross(edgeA, edgeB));
+        triangle.Color = glm::vec3{ 255.f, 0.f, 0.f };
 
         for (size_t i = 0; i < 3; i++)
         {
 
             //Convert to NDC coordinates
-            glm::vec4 NDC = glm::vec4(triangle.vertices[i].x / triangle.vertices[i].w, triangle.vertices[i].y / triangle.vertices[i].w, 
-                triangle.vertices[i].z / triangle.vertices[i].w, triangle.vertices[i].w);
+            glm::vec4 NDC = glm::vec4(triangle.viewspaceCoords[i].x / triangle.viewspaceCoords[i].w, triangle.viewspaceCoords[i].y / triangle.viewspaceCoords[i].w, 
+                triangle.viewspaceCoords[i].z / triangle.viewspaceCoords[i].w, triangle.viewspaceCoords[i].w);
 
             triangle.NDC[i] = NDC;
-
             //Convert To Screenspace
             glm::vec3 screenSpace;
 
@@ -619,7 +660,7 @@ void cudaRasterizeCore(uchar4* PBOpos, glm::vec2 resolution, const glm::vec3* pV
 
     //Primitive assmebly | creating the triangles
     primitiveBlocks = ceil(((float)indexAmount / 3) / ((float)tileSize));
-    primitiveAssemblyKernel << <primitiveBlocks, tileSize >> > (dev_pOutputVertexBuffer, vertexAnmount, dev_pIndexBuffer, indexAmount, dev_pTriangleBuffer, resolution);
+    primitiveAssemblyKernel << <primitiveBlocks, tileSize >> > (dev_pOutputVertexBuffer, dev_pVertexBuffer,  vertexAnmount, dev_pIndexBuffer, indexAmount, dev_pTriangleBuffer, resolution);
     checkCUDAError("Primitive assmebly failed");
 
 

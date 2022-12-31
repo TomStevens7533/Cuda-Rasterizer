@@ -3,9 +3,12 @@
 
 struct Input_Triangle
 {
-	glm::vec4 vertices[3];
+	glm::vec3 worldSpaceCoords[3];
+	glm::vec4 viewspaceCoords[3];
 	glm::vec4 NDC[3];
 	glm::vec3 Screenspace[3];
+	glm::vec3 Normal;
+	glm::vec3 Color;
 };
 struct AABB {
 	glm::vec3 min;

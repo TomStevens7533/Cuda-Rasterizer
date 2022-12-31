@@ -143,17 +143,6 @@ void Camera::UpdateCamera()
 		m_CameraRot.x += m_ScreenPosOffset.y; //pitch rotate y
 		m_CameraRot.z = 0;
 
-
-
-		if (m_CameraRot.x > 89.0f) {
-			m_CameraRot.x = 89.0f;
-			return;
-		}
-		if (m_CameraRot.x < -89.0f) {
-			m_CameraRot.x = -89.0f;
-			return;
-		}
-
 		RotateYaw(m_ScreenPosOffset.x);
 		RotatePitch(-m_ScreenPosOffset.y);
 
