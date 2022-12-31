@@ -27,7 +27,7 @@ __device__ glm::vec3* framebuffer;
 
 //Lighting information
 __device__ __constant__ const float3 Dev_lightDirection{ 0.577f , -0.577f, -0.577f };
-__device__ __constant__ const float3 Dev_lightColor{ 3.f,3.f,3.f };
+__device__ __constant__ const float3 Dev_lightColor{ 1.f,1.f,1.f };
 __device__ __constant__ const float Dev_LightIntensity = 1.f;
 __device__ __constant__ const float Dev_PI = 3.141592654f;
 
@@ -283,17 +283,25 @@ float Cuda_dot(float3 a, float3 b)
 
 __device__
 glm::vec3 PixelShading(glm::vec2 pixePos, Input_Triangle* CurrTriangle) {
-    float3 normal;
-    normal.x = -CurrTriangle->Normal.x;
-    normal.y = CurrTriangle->Normal.y;
-    normal.z = -CurrTriangle->Normal.z;
+    glm::vec3 lightDir;            
+    lightDir.x = Dev_lightDirection.x;
+    lightDir.y = Dev_lightDirection.y;
+    lightDir.z = Dev_lightDirection.z;
 
-   float lambertCosine = Cuda_dot(normal, Dev_lightDirection);
-   glm::vec3 LambertColor = (CurrTriangle->Color * 1.f) / Dev_PI; //BRDF LAMBERT
-   if (lambertCosine >= 0) {
-       return glm::vec3{ Dev_lightColor.x,Dev_lightColor.y, Dev_lightColor.z } *LambertColor * lambertCosine;
-   }
-   return glm::vec3{ 0.f, 0.f, 0.f };
+    //Shade side of cube
+    float intensity;
+    if (-CurrTriangle->Normal.y > 0)
+        intensity = 1.f;
+    else if (-CurrTriangle->Normal.y < 0)
+        intensity = 0.4f;
+    else if (CurrTriangle->Normal.x != 0)
+        intensity = 0.8f;
+    else if (CurrTriangle->Normal.z != 0)
+        intensity = 0.6f;
+
+    //float lambertCosine = glm::dot(lightDir, CurrTriangle->Normal);
+    glm::vec3 LambertColor = (CurrTriangle->Color * 1.f) / Dev_PI; //BRDF LAMBERT
+    return LambertColor * intensity;
 
 }
 __global__
@@ -546,8 +554,14 @@ __global__ void primitiveAssemblyKernel(glm::vec4* pDev_ViewSpaceVertexBufer,
         //Calculate triangle Normal
         glm::vec3 edgeA = (triangle.worldSpaceCoords[1] - triangle.worldSpaceCoords[0]);
         glm::vec3 edgeB = (triangle.worldSpaceCoords[2] - triangle.worldSpaceCoords[1]);
-        triangle.Normal = glm::normalize(glm::cross(edgeA, edgeB));
+        glm::vec3 normal = glm::normalize(glm::cross(edgeA, edgeB));
         triangle.Color = glm::vec3{ 255.f, 0.f, 0.f };
+
+       
+        
+        triangle.Normal = normal;
+        //printf("%f, %f, %f", triangle.Normal.x, triangle.Normal.y, triangle.Normal.z);
+        //printf("\n");
 
         for (size_t i = 0; i < 3; i++)
         {
