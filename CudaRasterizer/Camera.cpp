@@ -159,7 +159,7 @@ void Camera::UpdateCamera()
 
 		auto worldPos = m_Position;
 		auto look = getForward();
-		std::cout << worldPos.x << " " << worldPos.y << " " << worldPos.z << std::endl;
+		//std::cout << worldPos.x << " " << worldPos.y << " " << worldPos.z << std::endl;
 
 		CalcViewMatrix((glm::lookAt(worldPos, worldPos + look, glm::vec3{ 0,1,0 })), worldPos);
 		m_UpdateNeeded = false;

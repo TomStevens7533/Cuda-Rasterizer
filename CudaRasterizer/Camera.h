@@ -34,7 +34,7 @@ private:
 	float m_FarPlane = 1000.f;
 	float m_NearPlane = 0.1f;
 
-	glm::vec3 m_Position{0,0,-10 };
+	glm::vec3 m_Position{0,0,-50 };
 	glm::quat m_CameraQuaternion{};
 
 	glm::quat m_CameraQuaternionYaw{};

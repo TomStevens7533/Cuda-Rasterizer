@@ -1,5 +1,6 @@
 #pragma once
 #include "Window.h"
+#include "ChunkBuilder.h"
 
 struct GLFWwindow;
 class Application final {
@@ -14,5 +15,6 @@ public:
 private:
 	static Application* s_Instance;
 	Window m_Window;
+	ChunkMesh chk;
 
 };

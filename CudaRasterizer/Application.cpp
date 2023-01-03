@@ -3,7 +3,8 @@
 #include "Structs.h"
 #include "Renderer.h"
 #include <array>
-#include "Chunk.h"
+#include "ChunkBuilder.h"
+#include "Block.h"
 
 
 
@@ -13,6 +14,8 @@ Application::Application(int width, int height) : m_Window{width, height}
 {
 	s_Instance = this;
 	m_Window.InitWindow();
+
+
 }
 
 Application::~Application()
@@ -24,6 +27,8 @@ Application::~Application()
 
 void Application::Start()
 {
+
+	chk.TraverseSVO();
 
 }
 
@@ -77,15 +82,13 @@ void Application::Update()
 	//indexBuff.push_back(7);
 	//indexBuff.push_back(8);
 	//indexBuff.push_back(5);
-	Chunk chk;
+	//Chunk chk;
 
 
 
 
 
-
-
-
+	Chunk blx;
 	glm::mat4x4 trans = glm::translate(glm::mat4(1), glm::vec3{0,0, 0});
 	Renderer::Submit(chk.GetVertices().data(), chk.GetVertices().size(), chk.GetIndices().data(), chk.GetIndices().size(), trans);
 }

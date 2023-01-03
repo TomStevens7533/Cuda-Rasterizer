@@ -69,7 +69,7 @@ void Window::ShowFPS()
 		double fps = double(frame) / delta;
 
 		std::stringstream ss;
-		ss << "Soy de meigd" << " [" << fps << " FPS]";
+		ss << "A cool rasterizer" << " [" << fps << " FPS]";
 
 		glfwSetWindowTitle(m_Window, ss.str().c_str());
 

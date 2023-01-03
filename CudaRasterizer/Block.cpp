@@ -1,5 +1,5 @@
-#include "Chunk.h"
 #include <array>
+#include "Block.h"
 
 const std::array<float, 12> xFace2{
 	0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1,
@@ -29,46 +29,46 @@ const std::array<float, 12> bottomFace{
 
 Chunk::Chunk()
 {
-	GenerateFace(Faces::FRONT);
-	GenerateFace(Faces::BACK);
-	GenerateFace(Faces::BOT);
-	GenerateFace(Faces::TOP);
-	GenerateFace(Faces::LEFT);
-	GenerateFace(Faces::RIGHT);
+	GenerateFace(Faces1::FRONT);
+	GenerateFace(Faces1::BACK);
+	GenerateFace(Faces1::BOT);
+	GenerateFace(Faces1::TOP);
+	GenerateFace(Faces1::LEFT);
+	GenerateFace(Faces1::RIGHT);
 
 }
 
-void Chunk::GenerateFace(Faces dir)
+void Chunk::GenerateFace(Faces1 dir)
 {
 	const std::array<float, 12>* blockFace;
 	std::vector<int> indices;
 	switch (dir)
 	{
-	case Faces::TOP:
+	case Faces1::TOP:
 		blockFace = &topFace;
 		break;
-	case Faces::BOT:
+	case Faces1::BOT:
 		blockFace = &bottomFace;
 		break;
-	case Faces::LEFT:
+	case Faces1::LEFT:
 		blockFace = &leftFace;
 		break;
-	case Faces::RIGHT:
+	case Faces1::RIGHT:
 		blockFace = &rightFace;
 		break;
-	case Faces::FRONT:
+	case Faces1::FRONT:
 		blockFace = &frontFace;
 		break;
-	case Faces::BACK:
+	case Faces1::BACK:
 		blockFace = &backFace;
 		break;
 	default:
 		break;
 	}
 
-	for (size_t i = 0; i < blockFace->size(); i+=3)
+	for (size_t i = 0; i < blockFace->size(); i += 3)
 	{
-		glm::vec3 Vertex1Pos = glm::vec3{ (*blockFace)[i], (*blockFace)[i + 1], (*blockFace)[i + 2]  };
+		glm::vec3 Vertex1Pos = glm::vec3{ (*blockFace)[i], (*blockFace)[i + 1], (*blockFace)[i + 2] };
 		m_Vertices.push_back(Vertex1Pos);
 	}
 
@@ -87,4 +87,3 @@ std::vector<glm::vec3>& Chunk::GetVertices()
 {
 	return m_Vertices;
 }
-

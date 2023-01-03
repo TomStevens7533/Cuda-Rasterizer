@@ -1,7 +1,7 @@
 #pragma once
 #include "Structs.h"
 
-__device__ AABB getAABBForTriangle(const Input_Triangle tri)
+__device__ AABB getBBForTriangle(const Input_Triangle tri)
 {
 	AABB aabb;
 	aabb.min = glm::vec3(

@@ -13,7 +13,7 @@
 #include "DeviceStructs.h"
 
 struct Tile {
-    int m_TriangleIndexes[1000]; //Indexes of triangles that are in this Tile
+    int m_TriangleIndexes[10000]; //Indexes of triangles that are in this Tile
     int m_TriangleAmount{ 0 };
 };
 
@@ -28,16 +28,17 @@ __device__ glm::vec3* framebuffer;
 //Lighting information
 __device__ __constant__ const float3 Dev_lightDirection{ 0.577f , -0.577f, -0.577f };
 __device__ __constant__ const float3 Dev_lightColor{ 1.f,1.f,1.f };
-__device__ __constant__ const float Dev_LightIntensity = 1.f;
+__device__ __constant__ const float Dev_LightIntensity = 3.f;
 __device__ __constant__ const float Dev_PI = 3.141592654f;
+
 
 Tile* tileBuffer = NULL;
 int* dev_tileMutex = NULL;
 fragment* depthbuffer;
 glm::mat4x4* MV;
 
-#define TILE_H_AMOUNT 8
-#define TILE_W_AMOUNT 8
+#define TILE_H_AMOUNT 10
+#define TILE_W_AMOUNT 10
 int numTiles = (TILE_W_AMOUNT + 1) * (TILE_H_AMOUNT + 1);
 
 
@@ -61,7 +62,6 @@ void kernelCleanup()
     cudaFree(depthBufferLock);
     cudaFree(tileBuffer);
     cudaFree(dev_tileMutex);
-
 }
 //fast initializor for int array
 __global__ void initiateArray(int* array, int val, int num)
@@ -159,41 +159,51 @@ __host__ __device__ void getAABBForTriangle(Input_Triangle tri, glm::vec3& minpo
         max(max(tri.Screenspace[0].z, tri.Screenspace[1].z), tri.Screenspace[2].z));
 }
 __global__ void SortTrianglesInCorrectTile(Input_Triangle* primitives, int triangleSize, glm::vec2 resolution, int strideX, int strideY, int* dev_tilemutex, Tile* dev_tilebuffer) {
-    int index = (blockIdx.x * blockDim.x) + threadIdx.x;
-    if (index < triangleSize) {
-        Input_Triangle input = primitives[index];
-      
-        AABB boundingBox = getAABBForTriangle(input);
-        int tileidminX = glm::floor(boundingBox.min.x / strideX);
-        int tileidmaxX = glm::ceil(boundingBox.max.x /  strideX);
-        int tileidminY = glm::floor(boundingBox.min.y / strideY);
-        int tileidmaxY = glm::ceil(boundingBox.max.y /  strideY);
+    int triangleIndex = (blockIdx.x * blockDim.x) + threadIdx.x;
+    if (triangleIndex < triangleSize) {
+        Input_Triangle input = primitives[triangleIndex];
+            AABB boundingBox = getBBForTriangle(input);
 
-        int tilesX = (int)glm::ceil(double(resolution.x) / double(strideX));
 
-        for (int i = tileidminY; i < tileidmaxY; i++)
-        {
-            for (int j = tileidminX; j < tileidmaxX; j++)
+            int tileminX = glm::floor(boundingBox.min.x / strideX);
+            int tilemaxX = glm::ceil(boundingBox.max.x / strideX);
+            int tileminY = glm::floor(boundingBox.min.y / strideY);
+            int tilemaxY = glm::ceil(boundingBox.max.y / strideY);
+
+            int tilesX = (int)glm::ceil(double(resolution.x) / double(strideX));
+            int tilesy = (int)glm::ceil(double(resolution.y) / double(strideY));
+
+            //cliping
+            if (tilemaxY > tilesy || tileminY < 0 || tilemaxX > tilesX || tileminX < 0)
+                return;
+
+            
+
+            for (int i = tileminY; i < tilemaxY; i++)
             {
-                int tileID = j + i * tilesX;
-                bool isSet = false;
-                do
+                for (int j = tileminX; j < tilemaxX; j++)
                 {
-                    int oldValue = atomicCAS(&dev_tilemutex[tileID], 0, 1);
-                    isSet = (oldValue == 0);
-                    if (isSet)
+                    int tileID = j + i * tilesX;
+                    bool isSet = false;
+                    do
                     {
+                        int oldValue = atomicCAS(&dev_tilemutex[tileID], 0, 1);
+                        isSet = oldValue == 0;
+                        if (isSet)
+                        {
 
-                        //Critical sectie
-                        int t = dev_tilebuffer[tileID].m_TriangleAmount;
-                        dev_tilebuffer[tileID].m_TriangleIndexes[t] = index;
-                        dev_tilebuffer[tileID].m_TriangleAmount =  t + 1;
-                        dev_tilemutex[tileID] = 0;
-                    }
+                            //Critical sectie
+                            int t = dev_tilebuffer[tileID].m_TriangleAmount;
+                            dev_tilebuffer[tileID].m_TriangleIndexes[t] = triangleIndex;
+                            dev_tilebuffer[tileID].m_TriangleAmount = t + 1;
+                            dev_tilemutex[tileID] = 0;
+                        }
 
-                } while (!isSet);
+                    } while (!isSet);
+                }
             }
-        }
+
+       
     }
 }
 __global__
@@ -288,9 +298,10 @@ glm::vec3 PixelShading(glm::vec2 pixePos, Input_Triangle* CurrTriangle) {
     lightDir.y = Dev_lightDirection.y;
     lightDir.z = Dev_lightDirection.z;
 
+    CurrTriangle->Normal.y = -CurrTriangle->Normal.y;
     //Shade side of cube
     float intensity;
-    if (-CurrTriangle->Normal.y > 0)
+    if (CurrTriangle->Normal.y > 0)
         intensity = 1.f;
     else if (-CurrTriangle->Normal.y < 0)
         intensity = 0.4f;
@@ -299,9 +310,9 @@ glm::vec3 PixelShading(glm::vec2 pixePos, Input_Triangle* CurrTriangle) {
     else if (CurrTriangle->Normal.z != 0)
         intensity = 0.6f;
 
-    //float lambertCosine = glm::dot(lightDir, CurrTriangle->Normal);
-    glm::vec3 LambertColor = (CurrTriangle->Color * 1.f) / Dev_PI; //BRDF LAMBERT
-    return LambertColor * intensity;
+    float lambertCosine = glm::dot(lightDir, CurrTriangle->Normal);
+    glm::vec3 LambertColor = (CurrTriangle->Color * Dev_LightIntensity) / Dev_PI; //BRDF LAMBERT
+    return LambertColor * intensity * glm::clamp(lambertCosine, 0.2f, 1.f);
 
 }
 __global__
@@ -320,8 +331,7 @@ void RasterizePixels(int pixelXoffset, int pixelYoffset, int numpixelsX, int num
         //Discard tiles (ie kernel launches) that dont have any triangles inside them --> implicitly done by for loop
         for (int i = 0; i < dev_tilesList[tileID].m_TriangleAmount; i++)
         {
-           
-
+          
             int triangleIndex = dev_tilesList[tileID].m_TriangleIndexes[i];
             Input_Triangle currentTriangle = dev_primitives[triangleIndex];
 
@@ -372,8 +382,8 @@ void RasterizeTiles(Input_Triangle* primitives, int triangleSize, glm::vec2 reso
 
     dim3 blockCount1d_triangles(((triangleSize - 1) / numThreadsPerBlock.x) + 1);
     SortTrianglesInCorrectTile << <blockCount1d_triangles, numThreadsPerBlock >> > (primitives, triangleSize, resolution, stride_x, stride_y, dev_mutex, tileBuffer);
-
     cudaDeviceSynchronize();
+    checkCUDAError("Sort triangles failed");
 
 
     int sideLength2d = 25;
@@ -412,8 +422,8 @@ void RasterizeTiles(Input_Triangle* primitives, int triangleSize, glm::vec2 reso
         tileXcount = 0;
         tileYcount++;
     }
-    checkCUDAError("full rasterization failed");
     cudaDeviceSynchronize();
+    checkCUDAError("full rasterization failed");
 
     ////Debug in console
     //for (size_t h = 0; h < TILE_H_AMOUNT; h++)
@@ -479,14 +489,13 @@ void InitializeBuffers(glm::vec2 resolution) {
     cudaFree(dev_tileMutex);
     cudaMalloc(&dev_tileMutex, numTiles * sizeof(int));
     checkCUDAError("Setup TileBufferMutex failed");
-
-    MV = new glm::mat4x4;
-
 }
 
 __host__ void UpdateBuffers(const glm::vec3* pVertexBuffer, int vertexAnmount, const int* pIndexBuffer, int indexAmount) {
+    //Random device
 
-    
+
+
     if (dev_pOutputVertexBuffer != nullptr) {
 
         cudaFree(dev_pOutputVertexBuffer);
@@ -539,6 +548,8 @@ __global__ void primitiveAssemblyKernel(glm::vec4* pDev_ViewSpaceVertexBufer,
 
         Input_Triangle triangle;
         int f1, f2, f3;
+
+
         f1 = pDev_IndexBuffer[(index * 3)];
         f2 = pDev_IndexBuffer[(index * 3)+1];
         f3 = pDev_IndexBuffer[(index * 3)+2];
@@ -555,11 +566,23 @@ __global__ void primitiveAssemblyKernel(glm::vec4* pDev_ViewSpaceVertexBufer,
         glm::vec3 edgeA = (triangle.worldSpaceCoords[1] - triangle.worldSpaceCoords[0]);
         glm::vec3 edgeB = (triangle.worldSpaceCoords[2] - triangle.worldSpaceCoords[1]);
         glm::vec3 normal = glm::normalize(glm::cross(edgeA, edgeB));
-        triangle.Color = glm::vec3{ 255.f, 0.f, 0.f };
 
-       
-        
         triangle.Normal = normal;
+        if (index % 5 == 0) {
+            triangle.Color = glm::vec3{ 255.f, 0.f, 0.f };
+        }
+        else  if (index % 5 == 1) {
+            triangle.Color = glm::vec3{ 0.f, 255.f, 0.f };
+        }
+        else  if (index % 5 == 2) {
+            triangle.Color = glm::vec3{ 0.f, 0.f, 255.f };
+        }
+        else  if (index % 5 == 3) {
+            triangle.Color = glm::vec3{ 0.f, 255.f, 255.f };
+        }
+        else  if (index % 5 == 5) {
+            triangle.Color = glm::vec3{ 255.f, 0.f, 255.f };
+        }
         //printf("%f, %f, %f", triangle.Normal.x, triangle.Normal.y, triangle.Normal.z);
         //printf("\n");
 
@@ -569,22 +592,24 @@ __global__ void primitiveAssemblyKernel(glm::vec4* pDev_ViewSpaceVertexBufer,
             //Convert to NDC coordinates
             glm::vec4 NDC = glm::vec4(triangle.viewspaceCoords[i].x / triangle.viewspaceCoords[i].w, triangle.viewspaceCoords[i].y / triangle.viewspaceCoords[i].w, 
                 triangle.viewspaceCoords[i].z / triangle.viewspaceCoords[i].w, triangle.viewspaceCoords[i].w);
-
+           
             triangle.NDC[i] = NDC;
+
             //Convert To Screenspace
             glm::vec3 screenSpace;
 
-            screenSpace.x = ((NDC.x + 1) / 2) * resolution.x;
-            screenSpace.y = ((1 - NDC.y) / 2) * resolution.y;
+            screenSpace.x = ((NDC.x + 1.f)) * resolution.x * 0.5f;
+            screenSpace.y = ((1.f - NDC.y)) * resolution.y * 0.5f;
             screenSpace.z = ((NDC.z + 1.0f) * 0.5f);
             triangle.Screenspace[i] = screenSpace;
 
 
 
+
         }
 
+        pDev_TriangleInput[index] = triangle;
 
-       pDev_TriangleInput[index] = triangle;
 
     }
 }
