@@ -59,11 +59,11 @@ void ChunkMesh::TraverseSVONode(SVOBaseNode* pNode, int depth)
 		++m_blockdetected;
 
 		CheckGenerationOfFace(Faces::TOP, leafNode);
+		CheckGenerationOfFace(Faces::BOT, leafNode);
 		//GenerateFace(Faces::BACK,	leafNode->data);
 		//GenerateFace(Faces::FRONT,	leafNode->data);
 		//GenerateFace(Faces::LEFT,	leafNode->data);
 		//GenerateFace(Faces::RIGHT,	leafNode->data);
-		//GenerateFace(Faces::BOT,	leafNode->data);
 		return; //THIS NODE IS AN END NODE
 	}
 	SVOInnerNode* innerNode = static_cast<SVOInnerNode*>(pNode);
@@ -80,94 +80,248 @@ void ChunkMesh::TraverseSVONode(SVOBaseNode* pNode, int depth)
 	}
 
 }
-
 void ChunkMesh::CheckGenerationOfFace(Faces dir, SVOLeafNode* currLeafnode)
 {
 	SVOInnerNode* pParentNode = currLeafnode->pParentNode;
-	glm::vec3 checkPos{ currLeafnode->data};
-	int xID, yID, zID;
+	glm::vec3 checkPosVec{ currLeafnode->data };
 	int resolution = 2;
-	xID = (int)checkPos.x % resolution;
-	yID = (int)checkPos.y % resolution;
-	zID = (int)checkPos.z % resolution;
+	int xID{};
+	int yID{};
+	int zID{};
+	int currentID{};
+	int lookupID{};
+	int IDToMatch{};
+	bool isEvenNeeded{ false };
+	xID = (int)checkPosVec.x % resolution;
+	yID = (int)checkPosVec.y % resolution;
+	zID = (int)checkPosVec.z % resolution;
 
-
+	int CheckPos{};
 	switch (dir)
 	{
 	case Faces::TOP:
-		if (yID == 0) { //Even
-			SVOBaseNode* basep = pParentNode->children[xID][yID + 1][zID];
-			SVOLeafNode* leaf =	static_cast<SVOLeafNode*>(basep);
-			if (leaf->blockID == 1) {
-				return;
-			}
-			else
-				GenerateFace(Faces::TOP, currLeafnode->data);
-		}
-		else //Uneven go one layer above
-		{
-			SVOInnerNode* newParentNode = pParentNode->pParentNode;
-			do 
-			{
-				resolution *= 2;
-				int newyID;
-				int newYpos = checkPos.y + 1;
-				newyID = (newYpos % (resolution)) >= (resolution *0.5f) ? 1 : 0;
-				if (newyID == 1) {
-					SVOBaseNode* pNewBase = newParentNode->children[xID][newyID][zID];
-					while (!dynamic_cast<SVOLeafNode*>(pNewBase))
-					{
-						pNewBase = (static_cast<SVOInnerNode*>(pNewBase))->children[xID][newyID][zID];
-					}
-					SVOLeafNode* leafNode = (static_cast<SVOLeafNode*>(pNewBase));
-					if (leafNode->blockID == 1) {
-						//AIR
-						return;
-					}
-					else {
-						//BLOCK
-						GenerateFace(Faces::TOP, currLeafnode->data);
-					}
-
-					return;
-				}
-				else { //Go on Level Up
-					newParentNode = newParentNode->pParentNode;
-
-					if (checkPos.x == 0 && checkPos.z == 0) {
-						std::cout << checkPos.x << "|" << checkPos.z << "|" << resolution << std::endl;
-
-					}
-				
-				}
-			} while (newParentNode != nullptr);
-
-			
-			GenerateFace(Faces::TOP, glm::vec3{checkPos.x, CHUNKSIZE_Y - 1, checkPos.z});
-			return;
-		}	
-
-
+		CheckPos = checkPosVec.y + 1;
+		currentID = yID;
+		lookupID = currentID + 1;
+		IDToMatch = 1;
+		isEvenNeeded = true;
 		break;
-	case Faces::BOT: 
-		checkPos.y -= 1;
+	case Faces::BOT:
+		CheckPos = checkPosVec.y - 1;
+		currentID = yID;
+		lookupID = currentID - 1;
+		IDToMatch = 0;
+		isEvenNeeded = false;
 		break;
 	case Faces::LEFT:
-		checkPos.x -= 1;
+		CheckPos = checkPosVec.x - 1;
+		currentID = xID;
+		lookupID = currentID - 1;
 		break;
 	case Faces::RIGHT:
-		checkPos.x += 1;
+		CheckPos = checkPosVec.x + 1;
+		currentID = xID;
+		lookupID = currentID + 1;
 		break;
 	case Faces::FRONT:
-		checkPos.z += 1;
+		CheckPos = checkPosVec.z + 1;
+		currentID = zID;
+		lookupID = currentID + 1;
 		break;
 	case Faces::BACK:
-		checkPos.z -= 1;
+		CheckPos = checkPosVec.z - 1;
+		currentID = zID;
+		lookupID = currentID - 1;
 		break;
 	default:
 		break;
 	}
+	std::vector<int> debug;
+	bool isEven = currentID % 2 == 0;
+	if (isEven == (int)isEvenNeeded) { //Even
+		//Select node in same parent node
+		SVOBaseNode* basep = pParentNode->children[xID][lookupID][zID];
+		SVOLeafNode* leaf = static_cast<SVOLeafNode*>(basep);
+		if (leaf->blockID == 1) {
+			//GenerateFace(dir, currLeafnode->data);
+			return;
+		}
+		else
+			GenerateFace(dir, currLeafnode->data);
+	}
+	else //Uneven go one layer above
+	{
+		SVOInnerNode* newParentNode = pParentNode->pParentNode;
+		resolution = 4;
+		do
+		{
+
+			int newLocalID;
+
+			int newLookupPos = CheckPos;
+			/*if (newLookupPos >= 15) {
+				std::cout << checkPosVec.x << "|" << checkPosVec.z << "|" << resolution << std::endl;
+			}*/
+			if(isEvenNeeded)
+				newLocalID = (newLookupPos) >= (resolution - 1) ? 1 : 0;
+			else
+				newLocalID = (newLookupPos) <= (0 - 1) ? 1 : 0;
+
+			debug.push_back(newLookupPos);
+			debug.push_back(resolution);
+			resolution *= 2;
+
+			if (newLocalID == 0) {
+				//This has to be inverted when we areg going the opposite way look in 1 for child but go down to 0 for TOP
+				SVOBaseNode* pNewBase;
+				if (isEvenNeeded)
+					pNewBase = newParentNode->children[xID][1][zID];
+				else
+					pNewBase = newParentNode->children[xID][0][zID];
+
+				while (!dynamic_cast<SVOLeafNode*>(pNewBase))
+				{
+					if (isEvenNeeded)
+						pNewBase = (static_cast<SVOInnerNode*>(pNewBase))->children[xID][0][zID];
+					else
+						pNewBase = (static_cast<SVOInnerNode*>(pNewBase))->children[xID][1][zID];
+
+				}
+				SVOLeafNode* leafNode = (static_cast<SVOLeafNode*>(pNewBase));
+				if (leafNode->blockID == 1) {
+					//AIR
+					//GenerateFace(dir, currLeafnode->data);
+					return;
+				}
+				else {
+					//BLOCK
+					GenerateFace(dir, currLeafnode->data);
+				}
+
+				return;
+			}
+			else { //Go on Level Up
+				newParentNode = newParentNode->pParentNode;
+			}
+		} while (newParentNode != nullptr);
+
+
+		//Draw end of SVO 
+		switch (dir)
+		{
+		case Faces::TOP:
+			GenerateFace(dir, glm::vec3{ checkPosVec.x, CHUNKSIZE_Y - 1, checkPosVec.z });
+			break;
+		case Faces::BOT:
+			GenerateFace(dir, glm::vec3{ checkPosVec.x, 0, checkPosVec.z });
+			break;
+		case Faces::LEFT:
+			break;
+		case Faces::RIGHT:
+			break;
+		case Faces::FRONT:
+			break;
+		case Faces::BACK:
+			break;
+		default:
+			break;
+		}
+		if (checkPosVec.x == 0 && checkPosVec.z == 0) {
+			debug;
+			std::cout << checkPosVec.x << "|" << checkPosVec.z << "|" << resolution << std::endl;
+
+		}
+		return;
+	}
 }
+////void CheckGenerationOfFace1(Faces dir, SVOLeafNode* currLeafnode)
+//{
+//	SVOInnerNode* pParentNode = currLeafnode->pParentNode;
+//	glm::vec3 checkPos{ currLeafnode->data};
+//	int xID, yID, zID;
+//	int resolution = 2;
+//	xID = (int)checkPos.x % resolution;
+//	yID = (int)checkPos.y % resolution;
+//	zID = (int)checkPos.z % resolution;
+//
+//
+//	switch (dir)
+//	{
+//	case Faces::TOP:
+//			
+//
+//
+//		break;
+//	case Faces::BOT: 
+//		checkPos.y -= 1;
+//		if (yID == 1) { //Even
+//			SVOBaseNode* basep = pParentNode->children[xID][yID - 1][zID];
+//			SVOLeafNode* leaf = static_cast<SVOLeafNode*>(basep);
+//			if (leaf->blockID == 1) {
+//				return;
+//			}
+//			else
+//				GenerateFace(Faces::BOT, currLeafnode->data);
+//		}
+//		else //Uneven go one layer above
+//		{
+//			SVOInnerNode* newParentNode = pParentNode->pParentNode;
+//			do
+//			{
+//				resolution *= 2;
+//				int newyID;
+//				int newYpos = checkPos.y - 1;
+//				newyID = (newYpos % (resolution)) >= (resolution * 0.5f) ? 0 : 1;
+//				if (newyID == 0) {
+//					SVOBaseNode* pNewBase = newParentNode->children[xID][newyID][zID];
+//					while (!dynamic_cast<SVOLeafNode*>(pNewBase))
+//					{
+//						pNewBase = (static_cast<SVOInnerNode*>(pNewBase))->children[xID][newyID][zID];
+//					}
+//					SVOLeafNode* leafNode = (static_cast<SVOLeafNode*>(pNewBase));
+//					if (leafNode->blockID == 1) {
+//						//AIR
+//						return;
+//					}
+//					else {
+//						//BLOCK
+//						GenerateFace(Faces::BOT, currLeafnode->data);
+//					}
+//
+//					return;
+//				}
+//				else { //Go on Level Up
+//					newParentNode = newParentNode->pParentNode;
+//
+//					if (checkPos.x == 0 && checkPos.z == 0) {
+//						std::cout << checkPos.x << "|" << checkPos.z << "|" << resolution << std::endl;
+//
+//					}
+//
+//				}
+//			} while (newParentNode != nullptr);
+//
+//
+//			GenerateFace(Faces::BOT, glm::vec3{ checkPos.x, 0, checkPos.z });
+//			return;
+//		}
+//		break;
+//	case Faces::LEFT:
+//		checkPos.x -= 1;
+//		break;
+//	case Faces::RIGHT:
+//		checkPos.x += 1;
+//		break;
+//	case Faces::FRONT:
+//		checkPos.z += 1;
+//		break;
+//	case Faces::BACK:
+//		checkPos.z -= 1;
+//		break;
+//	default:
+//		break;
+//	}
+//}
 
 std::vector<glm::vec3>& ChunkMesh::GetVertices()
 {
@@ -216,7 +370,8 @@ void ChunkMesh::FillSVONode(SVOBaseNode* childToFill, int depth, int xPos, int y
 						//Fill in with leafnodes these are the end nodes
 						SVOLeafNode* newNode = new SVOLeafNode();
 						newNode->pParentNode = innerNode;
-						newNode->blockID = 1;
+						newNode->blockID = (rand() % 2 == 0 ? 0 : 1);
+						//newNode->blockID = 1;
 						innerNode->children[x][y][z] = newNode;
 
 					}
