@@ -60,10 +60,10 @@ void ChunkMesh::TraverseSVONode(SVOBaseNode* pNode, int depth)
 
 		CheckGenerationOfFace(Faces::TOP, leafNode);
 		CheckGenerationOfFace(Faces::BOT, leafNode);
-		//GenerateFace(Faces::BACK,	leafNode->data);
-		//GenerateFace(Faces::FRONT,	leafNode->data);
-		//GenerateFace(Faces::LEFT,	leafNode->data);
-		//GenerateFace(Faces::RIGHT,	leafNode->data);
+		CheckGenerationOfFace(Faces::BACK,	leafNode);
+		CheckGenerationOfFace(Faces::FRONT,	leafNode);
+		CheckGenerationOfFace(Faces::LEFT,	leafNode);
+		CheckGenerationOfFace(Faces::RIGHT,	leafNode);
 		return; //THIS NODE IS AN END NODE
 	}
 	SVOInnerNode* innerNode = static_cast<SVOInnerNode*>(pNode);
@@ -89,12 +89,18 @@ void ChunkMesh::CheckGenerationOfFace(Faces dir, SVOLeafNode* currLeafnode)
 	int yID{};
 	int zID{};
 	int currentID{};
-	int lookupID{};
+
+
+
 	int IDToMatch{};
 	bool isEvenNeeded{ false };
 	xID = (int)checkPosVec.x % resolution;
 	yID = (int)checkPosVec.y % resolution;
 	zID = (int)checkPosVec.z % resolution;
+
+	int xlookupID{xID};
+	int ylookupID{yID};
+	int zlookupID{zID};
 
 	int CheckPos{};
 	switch (dir)
@@ -102,36 +108,48 @@ void ChunkMesh::CheckGenerationOfFace(Faces dir, SVOLeafNode* currLeafnode)
 	case Faces::TOP:
 		CheckPos = checkPosVec.y + 1;
 		currentID = yID;
-		lookupID = currentID + 1;
+		ylookupID = currentID + 1;
 		IDToMatch = 1;
 		isEvenNeeded = true;
+		yID = 0;
 		break;
 	case Faces::BOT:
 		CheckPos = checkPosVec.y - 1;
 		currentID = yID;
-		lookupID = currentID - 1;
+		ylookupID = currentID - 1;
 		IDToMatch = 0;
 		isEvenNeeded = false;
+		yID = 1;
 		break;
 	case Faces::LEFT:
 		CheckPos = checkPosVec.x - 1;
 		currentID = xID;
-		lookupID = currentID - 1;
+		xlookupID = currentID - 1;
+		isEvenNeeded = false;
+		xID = 1;
+
 		break;
 	case Faces::RIGHT:
 		CheckPos = checkPosVec.x + 1;
 		currentID = xID;
-		lookupID = currentID + 1;
+		xlookupID = currentID + 1;
+		isEvenNeeded = true;
+		xID = 0;
 		break;
 	case Faces::FRONT:
 		CheckPos = checkPosVec.z + 1;
 		currentID = zID;
-		lookupID = currentID + 1;
+		zlookupID = currentID + 1;
+		zID = 0;
+		isEvenNeeded = true;
 		break;
 	case Faces::BACK:
 		CheckPos = checkPosVec.z - 1;
 		currentID = zID;
-		lookupID = currentID - 1;
+		zlookupID = currentID - 1;
+		zID = 1;
+		isEvenNeeded = false;
+
 		break;
 	default:
 		break;
@@ -140,7 +158,7 @@ void ChunkMesh::CheckGenerationOfFace(Faces dir, SVOLeafNode* currLeafnode)
 	bool isEven = currentID % 2 == 0;
 	if (isEven == (int)isEvenNeeded) { //Even
 		//Select node in same parent node
-		SVOBaseNode* basep = pParentNode->children[xID][lookupID][zID];
+		SVOBaseNode* basep = pParentNode->children[xlookupID][ylookupID][zlookupID];
 		SVOLeafNode* leaf = static_cast<SVOLeafNode*>(basep);
 		if (leaf->blockID == 1) {
 			//GenerateFace(dir, currLeafnode->data);
@@ -175,16 +193,16 @@ void ChunkMesh::CheckGenerationOfFace(Faces dir, SVOLeafNode* currLeafnode)
 				//This has to be inverted when we areg going the opposite way look in 1 for child but go down to 0 for TOP
 				SVOBaseNode* pNewBase;
 				if (isEvenNeeded)
-					pNewBase = newParentNode->children[xID][1][zID];
+					pNewBase = newParentNode->children[xID][yID][zID];
 				else
-					pNewBase = newParentNode->children[xID][0][zID];
+					pNewBase = newParentNode->children[xID][yID][zID];
 
 				while (!dynamic_cast<SVOLeafNode*>(pNewBase))
 				{
 					if (isEvenNeeded)
-						pNewBase = (static_cast<SVOInnerNode*>(pNewBase))->children[xID][0][zID];
+						pNewBase = (static_cast<SVOInnerNode*>(pNewBase))->children[xID][yID][zID];
 					else
-						pNewBase = (static_cast<SVOInnerNode*>(pNewBase))->children[xID][1][zID];
+						pNewBase = (static_cast<SVOInnerNode*>(pNewBase))->children[xID][yID][zID];
 
 				}
 				SVOLeafNode* leafNode = (static_cast<SVOLeafNode*>(pNewBase));
@@ -216,21 +234,25 @@ void ChunkMesh::CheckGenerationOfFace(Faces dir, SVOLeafNode* currLeafnode)
 			GenerateFace(dir, glm::vec3{ checkPosVec.x, 0, checkPosVec.z });
 			break;
 		case Faces::LEFT:
+			GenerateFace(dir, glm::vec3{ 0, checkPosVec.y, checkPosVec.z });
 			break;
 		case Faces::RIGHT:
+			GenerateFace(dir, glm::vec3{ CHUNKSIZE_X - 1, checkPosVec.y, checkPosVec.z });
 			break;
 		case Faces::FRONT:
+			GenerateFace(dir, glm::vec3{ checkPosVec.x, checkPosVec.y, CHUNKSIZE_X - 1 });
 			break;
 		case Faces::BACK:
+			GenerateFace(dir, glm::vec3{ checkPosVec.x, checkPosVec.y,  0 });
 			break;
 		default:
 			break;
 		}
-		if (checkPosVec.x == 0 && checkPosVec.z == 0) {
+		/*if (checkPosVec.y == 0 && checkPosVec.x == 0) {
 			debug;
 			std::cout << checkPosVec.x << "|" << checkPosVec.z << "|" << resolution << std::endl;
 
-		}
+		}*/
 		return;
 	}
 }
@@ -353,6 +375,13 @@ void ChunkMesh::FillSVONode(SVOBaseNode* childToFill, int depth, int xPos, int y
 		}
 		glm::vec3 position = glm::vec3{ xPos, yPos, zPos };
 		leafNode->data = position;
+		/*if (xPos < 2) {
+			leafNode->blockID = 0;
+		}
+		else*/
+		leafNode->blockID = 1;
+
+
 	}
 	else
 	{
@@ -370,8 +399,7 @@ void ChunkMesh::FillSVONode(SVOBaseNode* childToFill, int depth, int xPos, int y
 						//Fill in with leafnodes these are the end nodes
 						SVOLeafNode* newNode = new SVOLeafNode();
 						newNode->pParentNode = innerNode;
-						newNode->blockID = (rand() % 2 == 0 ? 0 : 1);
-						//newNode->blockID = 1;
+						//newNode->blockID = (rand() % 2 == 0 ? 0 : 1);
 						innerNode->children[x][y][z] = newNode;
 
 					}

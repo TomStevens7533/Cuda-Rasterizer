@@ -2,9 +2,9 @@
 #include "glm.hpp"
 #include <memory>
 #include <vector>
-#define  CHUNKSIZE_X 16
-#define  CHUNKSIZE_Z 16
-#define  CHUNKSIZE_Y 16
+#define  CHUNKSIZE_X 64
+#define  CHUNKSIZE_Z 64
+#define  CHUNKSIZE_Y 64
 
 #define  MAX_DEPTH 4
 enum class Faces
