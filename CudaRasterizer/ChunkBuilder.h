@@ -2,6 +2,8 @@
 #include "glm.hpp"
 #include <memory>
 #include <vector>
+#include "BlockType.h"	
+
 #define  CHUNKSIZE_X 64
 #define  CHUNKSIZE_Z 64
 #define  CHUNKSIZE_Y 64
@@ -28,7 +30,7 @@ struct SVOInnerNode final : public SVOBaseNode{
 struct SVOLeafNode final : public SVOBaseNode{
 	// Data for the voxel represented by this node
 	glm::vec3 data;
-	uint8_t blockID;
+	BlockTypes blockID;
 	SVOInnerNode* pParentNode = nullptr;
 };
 class ChunkMesh final

@@ -2,7 +2,6 @@
 #include <array>
 #include <iostream>
 
-
 const std::array<float, 12> xFace2{
 	0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1,
 };
@@ -160,7 +159,8 @@ void ChunkMesh::CheckGenerationOfFace(Faces dir, SVOLeafNode* currLeafnode)
 		//Select node in same parent node
 		SVOBaseNode* basep = pParentNode->children[xlookupID][ylookupID][zlookupID];
 		SVOLeafNode* leaf = static_cast<SVOLeafNode*>(basep);
-		if (leaf->blockID == 1) {
+		if (leaf->blockID == BlockTypes::AIR) {
+			//AIR
 			//GenerateFace(dir, currLeafnode->data);
 			return;
 		}
@@ -206,7 +206,7 @@ void ChunkMesh::CheckGenerationOfFace(Faces dir, SVOLeafNode* currLeafnode)
 
 				}
 				SVOLeafNode* leafNode = (static_cast<SVOLeafNode*>(pNewBase));
-				if (leafNode->blockID == 1) {
+				if (leafNode->blockID == BlockTypes::AIR) {
 					//AIR
 					//GenerateFace(dir, currLeafnode->data);
 					return;
@@ -379,7 +379,7 @@ void ChunkMesh::FillSVONode(SVOBaseNode* childToFill, int depth, int xPos, int y
 			leafNode->blockID = 0;
 		}
 		else*/
-		leafNode->blockID = 1;
+		leafNode->blockID = BlockTypes::AIR;
 
 
 	}

@@ -29,6 +29,7 @@
   <ItemGroup>
     <ClInclude Include="Application.h" />
     <ClInclude Include="Block.h" />
+    <ClInclude Include="BlockType.h" />
     <ClInclude Include="ChunkBuilder.h" />
     <ClInclude Include="DeltaTime.h" />
     <ClInclude Include="DeviceStructs.h" />
