@@ -4,14 +4,19 @@
 #include <vector>
 #include "BlockType.h"	
 
-#define  CHUNKSIZE_X 8
-#define  CHUNKSIZE_Z 8
-#define  CHUNKSIZE_Y 8
+#define  CHUNKSIZE_X 64
+#define  CHUNKSIZE_Z 64
+#define  CHUNKSIZE_Y 64
 
 #define  MAX_DEPTH 8
 enum class Faces
 {
-	TOP, BOT, LEFT, RIGHT, FRONT, BACK
+	//Positive
+	//0	  1	   2	
+	TOP, RIGHT, FRONT,
+	//Negative
+	//3      4     5 
+	BOT, LEFT, BACK
 
 };
 struct SVOBaseNode {
