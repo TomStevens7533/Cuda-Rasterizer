@@ -34,7 +34,7 @@ private:
 	float m_FarPlane = 1000.f;
 	float m_NearPlane = 0.1f;
 
-	glm::vec3 m_Position{0,0,-50 };
+	glm::vec3 m_Position{0,5,-50 };
 	glm::quat m_CameraQuaternion{};
 
 	glm::quat m_CameraQuaternionYaw{};
@@ -57,7 +57,7 @@ private:
 
 
 
-	float m_sensitivity = 100.f;
+	float m_sensitivity = 150.f;
 	//variables
 	float m_CameraMovementSpeed{ 25.f };
 

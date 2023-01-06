@@ -37,8 +37,8 @@ int* dev_tileMutex = NULL;
 fragment* depthbuffer;
 glm::mat4x4* MV;
 
-#define TILE_H_AMOUNT 10
-#define TILE_W_AMOUNT 10
+#define TILE_H_AMOUNT 5
+#define TILE_W_AMOUNT 5
 int numTiles = (TILE_W_AMOUNT + 1) * (TILE_H_AMOUNT + 1);
 
 
@@ -337,10 +337,15 @@ void RasterizePixels(int pixelXoffset, int pixelYoffset, int numpixelsX, int num
 
             int _x = (x + pixelXoffset);
             int _y = (y + pixelYoffset);
+
             float weights[3];
             if (IsPixelInTriangle(currentTriangle, glm::vec2{_x, _y}, weights, resolution)) { //In in triangle
+               
+                float totalWeight = weights[0] + weights[1] + weights[2];
+
                 float ZBufferValue = 1 / (((1 / currentTriangle.NDC[0].z) * weights[1]) + ((1 / currentTriangle.NDC[1].z) * weights[2])
                     + ((1 / currentTriangle.NDC[2].z) * weights[0]));
+
                 float interpolatedW = 1 / (((1 / currentTriangle.NDC[0].w) * weights[1]) + ((1 / currentTriangle.NDC[1].w) * weights[2])
                     + ((1 / currentTriangle.NDC[2].w) * weights[0]));
 
@@ -348,7 +353,6 @@ void RasterizePixels(int pixelXoffset, int pixelYoffset, int numpixelsX, int num
                 if (ZBufferValue > 0 && ZBufferValue < 1) { //Depth test | is interpolated value inside [0,1] range
                     fragment previousDepth = dev_depthBuffer[index];
                     if (interpolatedW < previousDepth.depth) {
-                        bool shouldWait = true;
                         fragment frag;
                         frag.color = PixelShading(glm::vec2{ _x, _y }, &currentTriangle);
                         frag.depth = interpolatedW;
@@ -530,7 +534,7 @@ __global__ void vertexShaderKernel(glm::vec3* pDev_vertexBuffer, glm::vec4* pDev
     //Safety check
     if (index < vertexAmount) {
         //Convert to viewspace
-        glm::vec4 viewSpaceP = (MV * glm::vec4(pDev_vertexBuffer[index].x, pDev_vertexBuffer[index].y, pDev_vertexBuffer[index].z, 1.f));
+        glm::vec4 viewSpaceP = (MV * glm::vec4(pDev_vertexBuffer[index].x, pDev_vertexBuffer[index].y, pDev_vertexBuffer[index].z, 1.f) );
 
 
         pDev_OutputvertexBuffer[index] = viewSpaceP;
@@ -550,9 +554,9 @@ __global__ void primitiveAssemblyKernel(glm::vec4* pDev_ViewSpaceVertexBufer,
         int f1, f2, f3;
 
 
-        f1 = pDev_IndexBuffer[(index * 3)];
+        f1 = pDev_IndexBuffer[(index * 3) + 2];
         f2 = pDev_IndexBuffer[(index * 3)+1];
-        f3 = pDev_IndexBuffer[(index * 3)+2];
+        f3 = pDev_IndexBuffer[(index * 3)];
 
         triangle.viewspaceCoords[0] = pDev_ViewSpaceVertexBufer[f1];
         triangle.viewspaceCoords[1] = pDev_ViewSpaceVertexBufer[f2];
@@ -565,24 +569,32 @@ __global__ void primitiveAssemblyKernel(glm::vec4* pDev_ViewSpaceVertexBufer,
         //Calculate triangle Normal
         glm::vec3 edgeA = (triangle.worldSpaceCoords[1] - triangle.worldSpaceCoords[0]);
         glm::vec3 edgeB = (triangle.worldSpaceCoords[2] - triangle.worldSpaceCoords[1]);
-        glm::vec3 normal = glm::normalize(glm::cross(edgeA, edgeB));
+        glm::vec3 normal = -glm::normalize(glm::cross(edgeA, edgeB));
 
         triangle.Normal = normal;
-        if (index % 5 == 0) {
-            triangle.Color = glm::vec3{ 255.f, 0.f, 0.f };
-        }
-        else  if (index % 5 == 1) {
-            triangle.Color = glm::vec3{ 0.f, 255.f, 0.f };
-        }
-        else  if (index % 5 == 2) {
-            triangle.Color = glm::vec3{ 0.f, 0.f, 255.f };
-        }
-        else  if (index % 5 == 3) {
-            triangle.Color = glm::vec3{ 0.f, 255.f, 255.f };
-        }
-        else  if (index % 5 == 5) {
-            triangle.Color = glm::vec3{ 255.f, 0.f, 255.f };
-        }
+
+        triangle.Normal = normal;
+        int xRange = (int)pDev_WorldSpaceVertexBufer[f1].x % 5;
+        int yRange = (int)pDev_WorldSpaceVertexBufer[f1].y % 5;
+        int zRange = (int)pDev_WorldSpaceVertexBufer[f1].z % 5;
+
+        triangle.Color = glm::vec3{ xRange * 70, yRange * 70, zRange * 70 };
+
+        //if (index % 5 == 0) {
+        //    triangle.Color = glm::vec3{ 255.f, 0.f, 0.f };
+        //}
+        //else  if (index % 5 == 1) {
+        //    triangle.Color = glm::vec3{ 0.f, 255.f, 0.f };
+        //}
+        //else  if (index % 5 == 2) {
+        //    triangle.Color = glm::vec3{ 0.f, 0.f, 255.f };
+        //}
+        //else  if (index % 5 == 3) {
+        //    triangle.Color = glm::vec3{ 0.f, 255.f, 255.f };
+        //}
+        //else  if (index % 5 == 5) {
+        //    triangle.Color = glm::vec3{ 255.f, 0.f, 255.f };
+        //}
         //printf("%f, %f, %f", triangle.Normal.x, triangle.Normal.y, triangle.Normal.z);
         //printf("\n");
 
@@ -590,8 +602,10 @@ __global__ void primitiveAssemblyKernel(glm::vec4* pDev_ViewSpaceVertexBufer,
         {
 
             //Convert to NDC coordinates
-            glm::vec4 NDC = glm::vec4(triangle.viewspaceCoords[i].x / triangle.viewspaceCoords[i].w, triangle.viewspaceCoords[i].y / triangle.viewspaceCoords[i].w, 
-                triangle.viewspaceCoords[i].z / triangle.viewspaceCoords[i].w, triangle.viewspaceCoords[i].w);
+            glm::vec4 NDC = glm::vec4(triangle.viewspaceCoords[i].x / triangle.viewspaceCoords[i].w
+                , triangle.viewspaceCoords[i].y / triangle.viewspaceCoords[i].w, 
+                  triangle.viewspaceCoords[i].z / triangle.viewspaceCoords[i].w
+                , triangle.viewspaceCoords[i].w);
            
             triangle.NDC[i] = NDC;
 

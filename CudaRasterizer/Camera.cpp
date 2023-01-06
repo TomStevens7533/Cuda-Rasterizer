@@ -41,13 +41,13 @@ glm::quat Camera::RotateDegrees(float angleRadians, const glm::vec3& axis)
 
 void Camera::CalculateInverseONB()
 {
-	m_ViewProjMatrix = m_Proj * (m_View);
+	glm::mat4 flipMatrix = glm::scale(glm::mat4(1.0), glm::vec3(1.0, -1.0, 1.0));
+	m_ViewProjMatrix = ((flipMatrix * m_Proj) * m_View);
 
 }
 void Camera::CalculateProjectionMatrix(float fov, float aspectRatio)
 {
-
-	m_Proj = glm::perspective(glm::radians(fov / 2.f), aspectRatio, m_NearPlane, m_FarPlane);
+	m_Proj = glm::perspectiveRH(glm::radians(fov), aspectRatio, m_NearPlane, m_FarPlane);
 	CalculateInverseONB();
 }
 
@@ -159,12 +159,11 @@ void Camera::UpdateCamera()
 
 		auto worldPos = m_Position;
 		auto look = getForward();
-		std::cout << worldPos.x << " " << worldPos.y << " " << worldPos.z << std::endl;
+		//std::cout << worldPos.x << " " << worldPos.y << " " << worldPos.z << std::endl;
 
-		CalcViewMatrix((glm::lookAt(worldPos, worldPos + look, glm::vec3{ 0,1,0 })), worldPos);
+		CalcViewMatrix((glm::lookAtRH(worldPos, worldPos + look, glm::vec3{ 0,1,0 })), worldPos);
 		m_UpdateNeeded = false;
 	}
-
 }
 
 glm::vec3 Camera::getForward() const
@@ -179,7 +178,7 @@ glm::vec3 Camera::getLeft() const
 
 glm::vec3 Camera::getUp() const
 {
-	return glm::conjugate(m_CameraQuaternion) * glm::vec3(0.0f, -1.0f, 0.0f);
+	return glm::conjugate(m_CameraQuaternion) * glm::vec3(0.0f, 1.0f, 0.0f);
 }
 
 void Camera::RotateYaw(float angleRadians)
@@ -191,7 +190,7 @@ void Camera::RotateYaw(float angleRadians)
 void Camera::RotatePitch(float angleRadians)
 {
 	float radians = glm::radians(angleRadians);
-	m_CameraQuaternionPitch *= RotateDegrees(radians, glm::vec3(0.0f, 0.0f, -1.0f));
+	m_CameraQuaternionPitch *= RotateDegrees(radians, glm::vec3(0.0f, 0.0f, 1.0f));
 }
 
 void Camera::RotateRoll(float angleRadians)

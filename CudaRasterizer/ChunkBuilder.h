@@ -4,9 +4,9 @@
 #include <vector>
 #include "BlockType.h"	
 
-#define  CHUNKSIZE_X 64
-#define  CHUNKSIZE_Z 64
-#define  CHUNKSIZE_Y 64
+#define  CHUNKSIZE_X 4
+#define  CHUNKSIZE_Z 4
+#define  CHUNKSIZE_Y 4
 
 #define  MAX_DEPTH 4
 enum class Faces

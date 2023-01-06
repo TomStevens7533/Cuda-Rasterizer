@@ -13,7 +13,7 @@ void Renderer::Submit(const glm::vec3* pVertexBuffer, int vertexBufferAmount, in
 {
 	//DrawCall
 	glm::mat4x4 matrix = (m_CurrData.pCamera->GetViewProjectionMatrix());
-	cudaRasterizeCore(m_CurrData.PBOpos, m_CurrData.resolution, pVertexBuffer, vertexBufferAmount, pIndexBuffer, indexBufferAmount, (matrix ));
+	cudaRasterizeCore(m_CurrData.PBOpos, m_CurrData.resolution, pVertexBuffer, vertexBufferAmount, pIndexBuffer, indexBufferAmount, (matrix * transform));
 }
 
 
