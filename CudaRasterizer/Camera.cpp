@@ -41,7 +41,9 @@ glm::quat Camera::RotateDegrees(float angleRadians, const glm::vec3& axis)
 
 void Camera::CalculateInverseONB()
 {
+	//Flip coordinate system
 	glm::mat4 flipMatrix = glm::scale(glm::mat4(1.0), glm::vec3(1.0, -1.0, 1.0));
+
 	m_ViewProjMatrix = ((flipMatrix * m_Proj) * m_View);
 
 }

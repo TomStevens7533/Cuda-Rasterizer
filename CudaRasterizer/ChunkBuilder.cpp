@@ -60,8 +60,9 @@ void ChunkMesh::TraverseSVONode(SVOBaseNode* pNode, int depth)
 			++m_blockdetected;
 			CheckGenerationOfFace(Faces::TOP, leafNode);
 			CheckGenerationOfFace(Faces::BOT, leafNode);
-			CheckGenerationOfFace(Faces::BACK, leafNode);
 			CheckGenerationOfFace(Faces::FRONT, leafNode);
+
+			CheckGenerationOfFace(Faces::BACK, leafNode);
 			CheckGenerationOfFace(Faces::LEFT, leafNode);
 			CheckGenerationOfFace(Faces::RIGHT, leafNode);
 		}
@@ -99,56 +100,79 @@ void ChunkMesh::CheckGenerationOfFace(Faces dir, SVOLeafNode* currLeafnode)
 	yID = (int)checkPosVec.y % resolution;
 	zID = (int)checkPosVec.z % resolution;
 
-	int xlookupID{xID};
-	int ylookupID{yID};
-	int zlookupID{zID};
+	int xLocallookupID{xID};
+	int yLocallookupID{yID};
+	int zLocallookupID{zID};
 
+
+	int xParentlookupID{ xID };
+	int yParentlookupID{ yID };
+	int zParentlookupID{ zID };
+
+	std::pair<int, bool> ParentLookupID3D[3];
+	ParentLookupID3D[0] = std::make_pair(xID, false);
+	ParentLookupID3D[1] = std::make_pair(yID, false);;
+	ParentLookupID3D[2] = std::make_pair(zID, false);;
+
+	
 	int CheckPos{};
 	switch (dir)
 	{
 	case Faces::TOP:
 		CheckPos = checkPosVec.y + 1;
 		currentID = yID;
-		ylookupID = currentID + 1;
-		IDToMatch = 1;
+		yLocallookupID = currentID + 1;
+		yParentlookupID = currentID - 1;
 		isEvenNeeded = true;
-		yID = 0;
+		ParentLookupID3D[1].second = true;
+
 		break;
 	case Faces::BOT:
 		CheckPos = checkPosVec.y - 1;
 		currentID = yID;
-		ylookupID = currentID - 1;
-		IDToMatch = 0;
+		yLocallookupID = currentID - 1;
+		yParentlookupID = currentID + 1;
+		ParentLookupID3D[1].second = true;
+
 		isEvenNeeded = false;
-		yID = 1;
 		break;
 	case Faces::LEFT:
 		CheckPos = checkPosVec.x - 1;
 		currentID = xID;
-		xlookupID = currentID - 1;
+		xLocallookupID = currentID - 1;
+		xParentlookupID = currentID + 1;
+		ParentLookupID3D[0].second = true;
 		isEvenNeeded = false;
-		xID = 1;
 
 		break;
 	case Faces::RIGHT:
 		CheckPos = checkPosVec.x + 1;
 		currentID = xID;
-		xlookupID = currentID + 1;
+		xLocallookupID = currentID + 1;
+		xParentlookupID = currentID - 1;
 		isEvenNeeded = true;
-		xID = 0;
+		ParentLookupID3D[0].second = true;
+
 		break;
 	case Faces::FRONT:
 		CheckPos = checkPosVec.z + 1;
 		currentID = zID;
-		zlookupID = currentID + 1;
-		zID = 0;
+		zLocallookupID = currentID + 1;
+		zParentlookupID = currentID - 1;
+
+		ParentLookupID3D[2].second = true;
+
 		isEvenNeeded = true;
 		break;
 	case Faces::BACK:
 		CheckPos = checkPosVec.z - 1;
 		currentID = zID;
-		zlookupID = currentID - 1;
-		zID = 1;
+		zLocallookupID = currentID - 1;
+		zParentlookupID = currentID + 1;
+		ParentLookupID3D[2].second = true;
+
+
+
 		isEvenNeeded = false;
 
 		break;
@@ -159,7 +183,7 @@ void ChunkMesh::CheckGenerationOfFace(Faces dir, SVOLeafNode* currLeafnode)
 	bool isEven = currentID % 2 == 0;
 	if (isEven == (int)isEvenNeeded) { //Even
 		//Select node in same parent node
-		SVOBaseNode* basep = pParentNode->children[xlookupID][ylookupID][zlookupID];
+		SVOBaseNode* basep = pParentNode->children[xLocallookupID][yLocallookupID][zLocallookupID];
 		SVOLeafNode* leaf = static_cast<SVOLeafNode*>(basep);
 		if (leaf->blockID != BlockTypes::AIR) {
 			//BLOCKED DONT RENDER FACE
@@ -176,41 +200,61 @@ void ChunkMesh::CheckGenerationOfFace(Faces dir, SVOLeafNode* currLeafnode)
 		do
 		{
 
-			int newLocalID;
+			bool isInResolutionRange = false;
 
-			int newLookupPos = CheckPos;
+			int CurrentAxisLookupPos = CheckPos;
 			/*if (newLookupPos >= 15) {
 				std::cout << checkPosVec.x << "|" << checkPosVec.z << "|" << resolution << std::endl;
 			}*/
-			if(isEvenNeeded)
-				newLocalID = (newLookupPos) >= (resolution - 1) ? 1 : 0;
+
+			//Is current Axis In Range
+			if ((CurrentAxisLookupPos) >= (resolution - 1) || (CurrentAxisLookupPos) <= (0 - 1)) {
+				isInResolutionRange = false;
+			}
 			else
-				newLocalID = (newLookupPos) <= (0 - 1) ? 1 : 0;
+				isInResolutionRange = true;
 
-			debug.push_back(newLookupPos);
-			debug.push_back(resolution);
-			resolution *= 2;
+		
 
-			if (newLocalID == 0) {
+			if (isInResolutionRange) {
+				//Scale other Axises ID with current Resolution
+				for (size_t i = 0; i < 3; i++)
+				{
+					std::pair currentID = ParentLookupID3D[i];
+					if(currentID.second == true) //IS ACTIVE AXIS
+						continue;
+
+					if (currentID.first == 0 || currentID.first == 1) {
+						float currentAxisPos = checkPosVec[i];
+						if (currentAxisPos >= ((resolution) / 2) && currentID.first != 1) {
+							currentID.first += 1;
+						}
+						else if (currentAxisPos < ((resolution) / 2) && currentID.first != 0)
+							currentID.first -= 1;
+					}
+					ParentLookupID3D[i] = currentID;
+
+
+				}
 				//This has to be inverted when we areg going the opposite way look in 1 for child but go down to 0 for TOP
 				SVOBaseNode* pNewBase;
-				if (isEvenNeeded)
-					pNewBase = newParentNode->children[xID][yID][zID];
-				else
-					pNewBase = newParentNode->children[xID][yID][zID];
+				//BV op de x met als positie (1,1,1) we kijken wel in de juiste x Sector maar met y gaan we altijd een sector boven ons kijken.
+				pNewBase = newParentNode->children[ParentLookupID3D[0].first][ParentLookupID3D[1].first][ParentLookupID3D[2].first];
 
 				while (!dynamic_cast<SVOLeafNode*>(pNewBase))
 				{
-					if (isEvenNeeded)
-						pNewBase = (static_cast<SVOInnerNode*>(pNewBase))->children[xID][yID][zID];
-					else
-						pNewBase = (static_cast<SVOInnerNode*>(pNewBase))->children[xID][yID][zID];
-
+					pNewBase = (reinterpret_cast<SVOInnerNode*>(pNewBase))->children[xParentlookupID][yParentlookupID][zParentlookupID];
 				}
 				SVOLeafNode* leafNode = (static_cast<SVOLeafNode*>(pNewBase));
+
 				if (leafNode->blockID != BlockTypes::AIR) {
 					//BLOCKED DONT RENDER FACE
 					//GenerateFace(dir, currLeafnode->data);
+					std::cout << "FACE DIR: " << (int)dir << std::endl;
+					std::cout << "NOT RENDERING FACE AT POS: " << currLeafnode->data.x << " | " << currLeafnode->data.y << " | " << currLeafnode->data.z << std::endl;
+					std::cout << "BECAUSE BLOCKED AT POS: "   << leafNode->data.x << " | " << leafNode->data.y << " | " << leafNode->data.z << std::endl;
+					std::cout << "------------------------------------------------\n";
+
 					return;
 				}
 				else {
@@ -220,7 +264,9 @@ void ChunkMesh::CheckGenerationOfFace(Faces dir, SVOLeafNode* currLeafnode)
 
 				return;
 			}
-			else { //Go on Level Up
+			else { //Go on Level Up	
+				//Not in required resolution move one level up!
+				resolution *= 2;
 				newParentNode = newParentNode->pParentNode;
 			}
 		} while (newParentNode != nullptr);
@@ -386,9 +432,7 @@ void ChunkMesh::FillSVONode(SVOBaseNode* childToFill, int depth, int xPos, int y
 		//else if(xPos == 0) {
 		//	leafNode->blockID = BlockTypes::AIR;
 		//}
-		/*if (yPos == CHUNKSIZE_Y - 1) {
-			leafNode->blockID = BlockTypes::AIR;
-		}*/
+	
 		//else if (yPos == 0) {
 		//	leafNode->blockID = BlockTypes::AIR;
 		//	++m_blockdetected;
@@ -402,6 +446,10 @@ void ChunkMesh::FillSVONode(SVOBaseNode* childToFill, int depth, int xPos, int y
 		//else if (zPos == 0) {
 		//	leafNode->blockID = BlockTypes::AIR;
 		//}
+		if (yPos >= CHUNKSIZE_Y - 2 || yPos == 0) {
+			leafNode->blockID = (rand() % 2 == 0 ? AIR : BLOCK);
+		}
+		else
 		{
 			++m_blockdetected;
 			leafNode->blockID = BlockTypes::BLOCK;
