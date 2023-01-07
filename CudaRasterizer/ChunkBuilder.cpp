@@ -1,7 +1,7 @@
 #include "ChunkBuilder.h"
 #include <array>
 #include <iostream>
-
+#include <cmath>
 const std::array<float, 12> xFace2{
 	0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1,
 };
@@ -388,6 +388,7 @@ void ChunkMesh::FillSVONode(SVOBaseNode* childToFill, int depth, int xPos, int y
 		//Generate Block
 		BlockTypes terrainID = GetTerrainData(position);
 		leafNode->blockID = terrainID;
+		leafNode->data = position;
 		if (terrainID == AIR)
 		{ //IS EMPTY
 		}
@@ -442,7 +443,19 @@ void ChunkMesh::FillSVONode(SVOBaseNode* childToFill, int depth, int xPos, int y
 
 BlockTypes ChunkMesh::GetTerrainData(glm::vec3 position)
 {
-	return BlockTypes::BLOCK;
+
+	float value = static_cast<float>((perlin.octave2D_01((position.x) / 64.f, (position.z) / 64.f, 8)));
+	float value2 = static_cast<float>((perlin.octave2D_01((position.x) / 128.f, (position.z) / 128.f, 8)));
+	float value3 = static_cast<float>((perlin.octave2D_01((position.x) / 256.f, (position.z) / 256.f, 8)));
+
+	float totalValue = static_cast<float>((value * value2 * value3 * value3 - 0) / (1 - 0));
+	int height = static_cast<int>(std::lerp(CHUNKSIZE_Y_MIN_TERRAIN, CHUNKSIZE_Y_MAX_TERRAIN, totalValue)) + 1;
+
+	if (position.y >= height)
+		return AIR;
+	else
+		return BlockTypes::BLOCK;
+
 }
 void ChunkMesh::GenerateFace(Faces dir, glm::vec3 position)
 {

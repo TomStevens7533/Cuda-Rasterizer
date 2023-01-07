@@ -5,9 +5,12 @@
 #include "BlockType.h"	
 #include "Content/PerlinNoise.hpp"
 
-#define  CHUNKSIZE_X 64
-#define  CHUNKSIZE_Z 64
-#define  CHUNKSIZE_Y 64
+#define  CHUNKSIZE_X 128
+#define  CHUNKSIZE_Z 128
+#define  CHUNKSIZE_Y 128
+#define  CHUNKSIZE_Y_MAX_TERRAIN 120
+#define  CHUNKSIZE_Y_MIN_TERRAIN 10
+
 
 #define  MAX_DEPTH 8
 enum class Faces
