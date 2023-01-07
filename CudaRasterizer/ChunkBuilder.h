@@ -3,6 +3,7 @@
 #include <memory>
 #include <vector>
 #include "BlockType.h"	
+#include "Content/PerlinNoise.hpp"
 
 #define  CHUNKSIZE_X 64
 #define  CHUNKSIZE_Z 64
@@ -51,7 +52,7 @@ public:
 private:
 	void FillSVO();
 	void FillSVONode(SVOBaseNode* childToFill, int depth, int resolution, int xPos, int yPos, int zPos);
-	bool GetTerrainData();
+	BlockTypes GetTerrainData(glm::vec3 position);
 	void GenerateFace(Faces dir, glm::vec3 position);
 	void TraverseSVONode(SVOBaseNode* pNode, int depth);
 	void CheckGenerationOfFace(Faces dir, SVOLeafNode* currLeafnode);
@@ -64,5 +65,6 @@ private:
 	int m_blockdetected{ 0 };
 	int m_Facedetected{ 0 };
 
+	const siv::PerlinNoise perlin{ time(NULL)};
 
 };

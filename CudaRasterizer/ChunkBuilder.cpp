@@ -171,91 +171,78 @@ void ChunkMesh::CheckGenerationOfFace(Faces dir, SVOLeafNode* currLeafnode)
 	}
 	std::vector<int> debug;
 	bool isEven = currentID % 2 == 0;
-	if (isEven == (int)isEvenNeeded) { //Even
-		//Select node in same parent node
+	if (isEven == (int)isEvenNeeded) { //CHECK IF WE CAN CHECK IN SAME OCTREE NODE
+		//Select lookup leafnode from same parent;
 		SVOBaseNode* basep = pParentNode->children[xLocallookupID][yLocallookupID][zLocallookupID];
 		SVOLeafNode* leaf = static_cast<SVOLeafNode*>(basep);
+		//CHECK IF VISIBLE OR INVISIBLE
 		if (leaf->blockID != BlockTypes::AIR) {
 			//BLOCKED DONT RENDER FACE
-			//GenerateFace(dir, currLeafnode->data);
 			return;
 		}
 		else
 			GenerateFace(dir, currLeafnode->data);
 	}
-	else //Uneven go one layer above
+	else //Not IN the same octree
 	{
-		SVOInnerNode* newParentNode = pParentNode->pParentNode;
 		resolution = CHUNKSIZE_X;
-
-
-			bool isInResolutionRange = false;
-
-			int CurrentAxisLookupPos = CheckPos;
-			/*if (newLookupPos >= 15) {
-				std::cout << checkPosVec.x << "|" << checkPosVec.z << "|" << resolution << std::endl;
-			}*/
-
-			//Is current Axis In Range
-			if ((CurrentAxisLookupPos) >= (resolution) || (CurrentAxisLookupPos) <= (0 - 1)) {
-				isInResolutionRange = false;
-			}
-			else
-				isInResolutionRange = true;
+		bool isInResolutionRange = false;
+		int CurrentAxisLookupPos = CheckPos; //Current axis check pos
+		//Is current Axis In Range Full resolution
+		if ((CurrentAxisLookupPos) >= (resolution) || (CurrentAxisLookupPos) <= (-1)) {
+			isInResolutionRange = false;
+		}
+		else
+			isInResolutionRange = true;
 
 		
+		//Is in range
+		if (isInResolutionRange) {
+			//Scale other Axises ID with current Resolution
+			SVOBaseNode* pNewBase = m_StarterNode;
+			resolution = CHUNKSIZE_X;
 
-			if (isInResolutionRange) {
-				//Scale other Axises ID with current Resolution
-				SVOBaseNode* pNewBase = m_StarterNode;
-				resolution = CHUNKSIZE_X;
-				//!(dynamic_cast<SVOLeafNode*>(pNewBase))
-				int localSectorOffset[3]{0,0,0};
-				do 
+			//Save local octree sector position
+			int localSectorOffset[3]{0,0,0};
+			do 
+			{
+				for (size_t i = 0; i < 3; i++)
 				{
-					for (size_t i = 0; i < 3; i++)
-					{
-						int position = (int)checkPosVec[i];
+					//Get axis position
+					int position = (int)checkPosVec[i];
 
-						if (position < (resolution / 2) + localSectorOffset[i]) {
-							ParentLookupID3D[i] = 0;
-						}
-						else
-							ParentLookupID3D[i] = 1;
-
-						localSectorOffset[i] += (resolution / 2)  * ParentLookupID3D[i];
+					//Check in which ID postion ios located
+					if (position < (resolution / 2) + localSectorOffset[i]) {
+						ParentLookupID3D[i] = 0;
 					}
-					pNewBase = (static_cast<SVOInnerNode*>(pNewBase)->children[ParentLookupID3D[0]]
-						[ParentLookupID3D[1]]
-						[ParentLookupID3D[2]]);
-					resolution *= 0.5f;
-				} while (!(dynamic_cast<SVOLeafNode*>(pNewBase)));
+					else
+						ParentLookupID3D[i] = 1;
 
-				//This has to be inverted when we areg going the opposite way look in 1 for child but go down to 0 for TOP
-				//BV op de x met als positie (1,1,1) we kijken wel in de juiste x Sector maar met y gaan we altijd een sector boven ons kijken.
-				//
-				//std::cout << "FACE DIR: " << (int)dir << std::endl;
-				//std::cout << "NOT IN CURRENT SECTOR: " << xID << " | " << yID << " | " << zID<< std::endl;
-				//std::cout << "RESOLUTION: " << resolution << std::endl;
-				//std::cout << "LOOKING IN SECOR ID: " << ParentLookupID3D[0] << " | " << ParentLookupID3D[1] << " | " << ParentLookupID3D[2] << std::endl;
-				//std::cout << "------------------------------------------------\n";
-
-				SVOLeafNode* leafNode = (static_cast<SVOLeafNode*>(pNewBase));
-
-				if (leafNode->blockID != BlockTypes::AIR) {
-					//BLOCKED DONT RENDER FACE
-					//GenerateFace(dir, currLeafnode->data);
-					return;
+					//Save current sector offset
+					localSectorOffset[i] += (resolution / 2)  * ParentLookupID3D[i];
 				}
-				else {
-					//BLOCK
-					GenerateFace(dir, currLeafnode->data);
-				}
+				//Get octree child
+				pNewBase = (static_cast<SVOInnerNode*>(pNewBase)->children[ParentLookupID3D[0]]
+					[ParentLookupID3D[1]]
+					[ParentLookupID3D[2]]);
+				resolution *= 0.5f;
+				//Untill we have found a leafnode
+			} while (!(dynamic_cast<SVOLeafNode*>(pNewBase)));
+			SVOLeafNode* leafNode = (static_cast<SVOLeafNode*>(pNewBase));
 
+			if (leafNode->blockID != BlockTypes::AIR) {
+				//BLOCKED DONT RENDER FACE
 				return;
 			}
+			else {
+				//BLOCK
+				GenerateFace(dir, currLeafnode->data);
+			}
 
-		//Draw end of SVO 
+			return;
+		}
+
+		//Draw faces at the end of our SVO resolution
 		switch (dir)
 		{
 		case Faces::TOP:
@@ -279,11 +266,6 @@ void ChunkMesh::CheckGenerationOfFace(Faces dir, SVOLeafNode* currLeafnode)
 		default:
 			break;
 		}
-		/*if (checkPosVec.y == 0 && checkPosVec.x == 0) {
-			debug;
-			std::cout << checkPosVec.x << "|" << checkPosVec.z << "|" << resolution << std::endl;
-
-		}*/
 		return;
 	}
 }
@@ -401,45 +383,17 @@ void ChunkMesh::FillSVONode(SVOBaseNode* childToFill, int depth, int xPos, int y
 	if (resolution <= 1)
 	{
 		auto leafNode = static_cast<SVOLeafNode*>(childToFill);
+		glm::vec3 position = glm::vec3{ xPos, yPos, zPos };
+
 		//Generate Block
-		bool terrainID = GetTerrainData();
-		if (terrainID == false)
+		BlockTypes terrainID = GetTerrainData(position);
+		leafNode->blockID = terrainID;
+		if (terrainID == AIR)
 		{ //IS EMPTY
 		}
-		glm::vec3 position = glm::vec3{ xPos, yPos, zPos };
-		leafNode->data = position;
-		//CULLING TEST
-		//if (xPos == CHUNKSIZE_X -1) {
-		//	leafNode->blockID = BlockTypes::AIR;
-		//}
-		//else if(xPos == 0) {
-		//	leafNode->blockID = BlockTypes::AIR;
-		//}
-	
-		//else if (yPos == 0) {
-		//	leafNode->blockID = BlockTypes::AIR;
-		//	++m_blockdetected;
-		//}
-		//else if (yPos == CHUNKSIZE_Y / 2) {
-		//	leafNode->blockID = BlockTypes::AIR;
-		//}
-		//else if (zPos == CHUNKSIZE_X - 1) {
-		//	leafNode->blockID = BlockTypes::AIR;
-		//}
-		//else if (zPos == 0) {
-		//	leafNode->blockID = BlockTypes::AIR;
-		//}
-		if (yPos >= CHUNKSIZE_Y - 2 || yPos == 0) {
-			leafNode->blockID = (rand() % 2 == 0 ? AIR : BLOCK);
-		}
-		else
-		{
+		else {
 			++m_blockdetected;
-			leafNode->blockID = BlockTypes::BLOCK;
 		}
-		
-
-
 	}
 	else
 	{
@@ -486,9 +440,9 @@ void ChunkMesh::FillSVONode(SVOBaseNode* childToFill, int depth, int xPos, int y
 	return;
 }
 
-bool ChunkMesh::GetTerrainData()
+BlockTypes ChunkMesh::GetTerrainData(glm::vec3 position)
 {
-	return true;
+	return BlockTypes::BLOCK;
 }
 void ChunkMesh::GenerateFace(Faces dir, glm::vec3 position)
 {
