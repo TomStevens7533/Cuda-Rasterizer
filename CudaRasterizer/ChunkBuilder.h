@@ -5,14 +5,15 @@
 #include "BlockType.h"	
 #include "Content/PerlinNoise.hpp"
 
-#define  CHUNKSIZE_X 128
-#define  CHUNKSIZE_Z 128
-#define  CHUNKSIZE_Y 128
-#define  CHUNKSIZE_Y_MAX_TERRAIN 120
-#define  CHUNKSIZE_Y_MIN_TERRAIN 10
+#define  CHUNKSIZE_X 256
+#define  CHUNKSIZE_Z 256
+#define  CHUNKSIZE_Y 256
+#define  CHUNKSIZE_Y_MAX_TERRAIN 255
+#define  CHUNKSIZE_Y_MIN_TERRAIN 140
 
 
 #define  MAX_DEPTH 8
+#define MAKE_SPARSE
 enum class Faces
 {
 	//Positive
@@ -25,6 +26,7 @@ enum class Faces
 };
 struct SVOBaseNode {
 	virtual ~SVOBaseNode() = default;
+	bool m_IsEndNode = false;
 };
 struct SVOInnerNode final : public SVOBaseNode{
 	SVOInnerNode() = default;
@@ -32,7 +34,7 @@ struct SVOInnerNode final : public SVOBaseNode{
 		for (size_t i = 0; i < 8; i++)
 			delete children[i];
 	}
-	// Pointers to this node's children (if it is an internal node)
+	// Pointers to this node's children
 	SVOBaseNode* children[2][2][2]; //X Y Z
 	SVOInnerNode* pParentNode = nullptr;
 };

@@ -53,6 +53,10 @@ void ChunkMesh::TraverseSVONode(SVOBaseNode* pNode, int depth)
 	if (pNode == nullptr)
 		return;
 
+	//If it is and end node stop here all data is further is sparse
+	if (pNode->m_IsEndNode)
+		return;
+
 	if (dynamic_cast<SVOLeafNode*>(pNode)) {
 		//FILL IN vertex information
 		auto leafNode = static_cast<SVOLeafNode*>(pNode);
@@ -68,6 +72,8 @@ void ChunkMesh::TraverseSVONode(SVOBaseNode* pNode, int depth)
 		return; //THIS NODE IS AN END NODE
 	}
 	SVOInnerNode* innerNode = static_cast<SVOInnerNode*>(pNode);
+
+
 	for (size_t x = 0; x < 2; x++)
 	{
 		for (size_t y = 0; y < 2; y++)
@@ -206,6 +212,12 @@ void ChunkMesh::CheckGenerationOfFace(Faces dir, SVOLeafNode* currLeafnode)
 			int localSectorOffset[3]{0,0,0};
 			do 
 			{
+				
+				//If it is and end node stop here all data is further is sparse
+				if (pNewBase->m_IsEndNode)
+					return;
+
+
 				for (size_t i = 0; i < 3; i++)
 				{
 					//Get axis position
@@ -391,6 +403,7 @@ void ChunkMesh::FillSVONode(SVOBaseNode* childToFill, int depth, int xPos, int y
 		leafNode->data = position;
 		if (terrainID == AIR)
 		{ //IS EMPTY
+
 		}
 		else {
 			++m_blockdetected;
@@ -400,6 +413,15 @@ void ChunkMesh::FillSVONode(SVOBaseNode* childToFill, int depth, int xPos, int y
 	{
 		int newResolution = resolution / 2;
 		
+#ifdef MAKE_SPARSE
+		int localNodeID = resolution - (yPos % resolution);
+		int topYpos = yPos + localNodeID;
+		if (topYpos < (CHUNKSIZE_Y_MIN_TERRAIN - 1)) {
+			childToFill->m_IsEndNode = true;
+			return;
+		}
+#endif // MAKE_SPARSE
+
 		SVOInnerNode* innerNode = static_cast<SVOInnerNode*>(childToFill);
 
 		for (size_t x = 0; x < 2; x++)
@@ -425,6 +447,7 @@ void ChunkMesh::FillSVONode(SVOBaseNode* childToFill, int depth, int xPos, int y
 				}
 			}
 		}
+		
 	
 		FillSVONode(innerNode->children[0][0][0], depth - 1, xPos, yPos, zPos, newResolution);
 		FillSVONode(innerNode->children[1][0][0], depth - 1, xPos + newResolution, yPos, zPos, newResolution);
@@ -443,12 +466,11 @@ void ChunkMesh::FillSVONode(SVOBaseNode* childToFill, int depth, int xPos, int y
 
 BlockTypes ChunkMesh::GetTerrainData(glm::vec3 position)
 {
-
 	float value = static_cast<float>((perlin.octave2D_01((position.x) / 64.f, (position.z) / 64.f, 8)));
 	float value2 = static_cast<float>((perlin.octave2D_01((position.x) / 128.f, (position.z) / 128.f, 8)));
-	float value3 = static_cast<float>((perlin.octave2D_01((position.x) / 256.f, (position.z) / 256.f, 8)));
 
-	float totalValue = static_cast<float>((value * value2 * value3 * value3 - 0) / (1 - 0));
+	float totalValue = static_cast<float>((value * value2));
+	//-0) / (1 - 0));
 	int height = static_cast<int>(std::lerp(CHUNKSIZE_Y_MIN_TERRAIN, CHUNKSIZE_Y_MAX_TERRAIN, totalValue)) + 1;
 
 	if (position.y >= height)

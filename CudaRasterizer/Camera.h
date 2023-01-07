@@ -31,10 +31,10 @@ private:
 	void moveLeft(float movement);
 	void moveUp(float movement);
 private:
-	float m_FarPlane = 100000.f;
+	float m_FarPlane = 1000000.f;
 	float m_NearPlane = 0.01f;
 
-	glm::vec3 m_Position{0,-5,-50 };
+	glm::vec3 m_Position{0,-150,-50 };
 	glm::quat m_CameraQuaternion{};
 
 	glm::quat m_CameraQuaternionYaw{};

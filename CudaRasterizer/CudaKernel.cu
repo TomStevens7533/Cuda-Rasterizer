@@ -37,8 +37,8 @@ int* dev_tileMutex = NULL;
 fragment* depthbuffer;
 glm::mat4x4* MV;
 
-#define TILE_H_AMOUNT 30
-#define TILE_W_AMOUNT 30
+#define TILE_H_AMOUNT 40
+#define TILE_W_AMOUNT 40
 int numTiles = (TILE_W_AMOUNT + 1) * (TILE_H_AMOUNT + 1);
 
 

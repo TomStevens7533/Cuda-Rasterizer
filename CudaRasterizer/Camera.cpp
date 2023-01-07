@@ -49,7 +49,7 @@ void Camera::CalculateInverseONB()
 }
 void Camera::CalculateProjectionMatrix(float fov, float aspectRatio)
 {
-	m_Proj = glm::perspectiveRH(glm::radians(fov), aspectRatio, m_NearPlane, m_FarPlane);
+	m_Proj = glm::perspective(glm::radians(fov), aspectRatio, m_NearPlane, m_FarPlane);
 	CalculateInverseONB();
 }
 
