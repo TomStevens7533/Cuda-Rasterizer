@@ -31,8 +31,8 @@ private:
 	void moveLeft(float movement);
 	void moveUp(float movement);
 private:
-	float m_FarPlane = 10000.f;
-	float m_NearPlane = 0.1f;
+	float m_FarPlane = 100000.f;
+	float m_NearPlane = 0.01f;
 
 	glm::vec3 m_Position{0,-5,-50 };
 	glm::quat m_CameraQuaternion{};

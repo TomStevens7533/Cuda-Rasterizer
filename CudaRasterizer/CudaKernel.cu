@@ -578,23 +578,23 @@ __global__ void primitiveAssemblyKernel(glm::vec4* pDev_ViewSpaceVertexBufer,
         int yRange = (int)pDev_WorldSpaceVertexBufer[f1].y % 5;
         int zRange = (int)pDev_WorldSpaceVertexBufer[f1].z % 5;
 
-        triangle.Color = glm::vec3{ xRange * 70, yRange * 70, zRange * 70 };
+        //triangle.Color = glm::vec3{ xRange * 70, yRange * 70, zRange * 70 };
 
-        //if (index % 5 == 0) {
-        //    triangle.Color = glm::vec3{ 255.f, 0.f, 0.f };
-        //}
-        //else  if (index % 5 == 1) {
-        //    triangle.Color = glm::vec3{ 0.f, 255.f, 0.f };
-        //}
-        //else  if (index % 5 == 2) {
-        //    triangle.Color = glm::vec3{ 0.f, 0.f, 255.f };
-        //}
-        //else  if (index % 5 == 3) {
-        //    triangle.Color = glm::vec3{ 0.f, 255.f, 255.f };
-        //}
-        //else  if (index % 5 == 5) {
-        //    triangle.Color = glm::vec3{ 255.f, 0.f, 255.f };
-        //}
+        if (index % 5 == 0) {
+            triangle.Color = glm::vec3{ 255.f, 0.f, 0.f };
+        }
+        else  if (index % 5 == 1) {
+            triangle.Color = glm::vec3{ 0.f, 255.f, 0.f };
+        }
+        else  if (index % 5 == 2) {
+            triangle.Color = glm::vec3{ 0.f, 0.f, 255.f };
+        }
+        else  if (index % 5 == 3) {
+            triangle.Color = glm::vec3{ 0.f, 255.f, 255.f };
+        }
+        else  if (index % 5 == 5) {
+            triangle.Color = glm::vec3{ 255.f, 0.f, 255.f };
+        }
         //printf("%f, %f, %f", triangle.Normal.x, triangle.Normal.y, triangle.Normal.z);
         //printf("\n");
 
