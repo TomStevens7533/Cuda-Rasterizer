@@ -42,14 +42,19 @@ ChunkMesh::~ChunkMesh()
 	}
 }
 
-void ChunkMesh::TraverseSVO()
+void ChunkMesh::TraverseSVO(glm::vec3 originPos, float lodDistance)
 {
-	TraverseSVONode(m_StarterNode, MAX_DEPTH);
+	m_Vertices.clear();
+	m_Indices.clear();
+	TraverseSVONode(m_StarterNode, CHUNKSIZE_X / 2, glm::vec3{CHUNKSIZE_X / 2, CHUNKSIZE_X / 2 , CHUNKSIZE_X /2 }, originPos, lodDistance);
 	std::cout << "Amount of block filled: " << m_blockdetected << std::endl;
 
 }
-void ChunkMesh::TraverseSVONode(SVOBaseNode* pNode, int depth)
+void ChunkMesh::TraverseSVONode(SVOBaseNode* pNode, int resolution, glm::vec3 nodeLocalPosition,
+	glm::vec3 originPos, float lodDistance)
 {
+
+
 	if (pNode == nullptr)
 		return;
 
@@ -62,35 +67,60 @@ void ChunkMesh::TraverseSVONode(SVOBaseNode* pNode, int depth)
 		auto leafNode = static_cast<SVOLeafNode*>(pNode);
 		if (leafNode->blockID != AIR) {
 			++m_blockdetected;
-			CheckGenerationOfFace(Faces::TOP, leafNode);
-			CheckGenerationOfFace(Faces::BOT, leafNode);
-			CheckGenerationOfFace(Faces::FRONT, leafNode);
-			CheckGenerationOfFace(Faces::BACK, leafNode);
-			CheckGenerationOfFace(Faces::LEFT, leafNode);
-			CheckGenerationOfFace(Faces::RIGHT, leafNode);
+			CheckGenerationOfFace(Faces::TOP,	leafNode, nodeLocalPosition);
+			CheckGenerationOfFace(Faces::BOT,	leafNode, nodeLocalPosition);
+			CheckGenerationOfFace(Faces::FRONT, leafNode, nodeLocalPosition);
+			CheckGenerationOfFace(Faces::BACK,	leafNode, nodeLocalPosition);
+			CheckGenerationOfFace(Faces::LEFT,	leafNode, nodeLocalPosition);
+			CheckGenerationOfFace(Faces::RIGHT, leafNode, nodeLocalPosition);
 		}
 		return; //THIS NODE IS AN END NODE
 	}
 	SVOInnerNode* innerNode = static_cast<SVOInnerNode*>(pNode);
 
-
-	for (size_t x = 0; x < 2; x++)
-	{
-		for (size_t y = 0; y < 2; y++)
+	if (resolution > 1) {
+		int newChildResolution = resolution * 0.5f;
+		for (size_t x = 0; x < 2; x++)
 		{
-			for (size_t z = 0; z < 2; z++)
+			for (size_t y = 0; y < 2; y++)
 			{
-				TraverseSVONode(innerNode->children[x][y][z], depth - 1);
+				for (size_t z = 0; z < 2; z++)
+				{
+					glm::vec3 newNodePosition = nodeLocalPosition;
+					newNodePosition.x += (x == 0 ? -1 : 1) * newChildResolution;
+					newNodePosition.y += (y == 0 ? -1 : 1) * newChildResolution;
+					newNodePosition.z += (z == 0 ? -1 : 1) * newChildResolution;
+					TraverseSVONode(innerNode->children[x][y][z], newChildResolution, newNodePosition, originPos, lodDistance);
 
+				}
 			}
 		}
 	}
+	else {
+		for (size_t x = 0; x < 2; x++)
+		{
+			for (size_t y = 0; y < 2; y++)
+			{
+				for (size_t z = 0; z < 2; z++)
+				{
+					glm::vec3 newNodePosition = nodeLocalPosition;
+					newNodePosition.x += (x == 0 ? -1 : 0);
+					newNodePosition.y += (y == 0 ? -1 : 0);
+					newNodePosition.z += (z == 0 ? -1 : 0);
+					TraverseSVONode(innerNode->children[x][y][z], 0, newNodePosition, originPos, lodDistance);
+
+				}
+			}
+		}
+
+	}
+	
 
 }
-void ChunkMesh::CheckGenerationOfFace(Faces dir, SVOLeafNode* currLeafnode)
+void ChunkMesh::CheckGenerationOfFace(Faces dir, SVOLeafNode* currLeafnode, glm::vec3 nodePos)
 {
 	SVOInnerNode* pParentNode = currLeafnode->pParentNode;
-	glm::vec3 checkPosVec{ currLeafnode->data };
+	glm::vec3 checkPosVec{ nodePos };
 	int resolution = 2;
 	int xID{};
 	int yID{};
@@ -187,7 +217,7 @@ void ChunkMesh::CheckGenerationOfFace(Faces dir, SVOLeafNode* currLeafnode)
 			return;
 		}
 		else
-			GenerateFace(dir, currLeafnode->data);
+			GenerateFace(dir, nodePos);
 	}
 	else //Not IN the same octree
 	{
@@ -248,7 +278,7 @@ void ChunkMesh::CheckGenerationOfFace(Faces dir, SVOLeafNode* currLeafnode)
 			}
 			else {
 				//BLOCK
-				GenerateFace(dir, currLeafnode->data);
+				GenerateFace(dir, nodePos);
 			}
 
 			return;
@@ -400,7 +430,6 @@ void ChunkMesh::FillSVONode(SVOBaseNode* childToFill, int depth, int xPos, int y
 		//Generate Block
 		BlockTypes terrainID = GetTerrainData(position);
 		leafNode->blockID = terrainID;
-		leafNode->data = position;
 		if (terrainID == AIR)
 		{ //IS EMPTY
 

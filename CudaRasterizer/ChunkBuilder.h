@@ -9,7 +9,7 @@
 #define  CHUNKSIZE_Z 256
 #define  CHUNKSIZE_Y 256
 #define  CHUNKSIZE_Y_MAX_TERRAIN 255
-#define  CHUNKSIZE_Y_MIN_TERRAIN 140
+#define  CHUNKSIZE_Y_MIN_TERRAIN 150
 
 
 #define  MAX_DEPTH 8
@@ -40,7 +40,6 @@ struct SVOInnerNode final : public SVOBaseNode{
 };
 struct SVOLeafNode final : public SVOBaseNode{
 	// Data for the voxel represented by this node
-	glm::vec3 data;
 	BlockTypes blockID;
 	SVOInnerNode* pParentNode = nullptr;
 };
@@ -49,18 +48,21 @@ class ChunkMesh final
 public:
 	ChunkMesh();
 	~ChunkMesh();
-	void TraverseSVO();
+	void TraverseSVO(glm::vec3 originPos, float lodDistance);
 	std::vector<glm::vec3>& GetVertices();
 	std::vector<int>& GetIndices();
 
 
 private:
 	void FillSVO();
-	void FillSVONode(SVOBaseNode* childToFill, int depth, int resolution, int xPos, int yPos, int zPos);
+	void FillSVONode(SVOBaseNode* childToFill, int depth,
+		int resolution, int xPos, int yPos, int zPos);
 	BlockTypes GetTerrainData(glm::vec3 position);
 	void GenerateFace(Faces dir, glm::vec3 position);
-	void TraverseSVONode(SVOBaseNode* pNode, int depth);
-	void CheckGenerationOfFace(Faces dir, SVOLeafNode* currLeafnode);
+	void TraverseSVONode(SVOBaseNode* pNode, int resolution, glm::vec3 nodeLocalPosition,
+		glm::vec3 originPos, float lodDistance);
+
+	void CheckGenerationOfFace(Faces dir, SVOLeafNode* currLeafnode, glm::vec3 nodePos);
 
 private:
 	SVOInnerNode* m_StarterNode = nullptr;

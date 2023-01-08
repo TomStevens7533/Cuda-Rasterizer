@@ -5,6 +5,7 @@
 #include <array>
 #include "ChunkBuilder.h"
 #include "Block.h"
+#include "Camera.h"
 
 
 
@@ -28,13 +29,15 @@ Application::~Application()
 void Application::Start()
 {
 
-	chk.TraverseSVO();
 
 }
 
-void Application::Update()
+void Application::Update(Camera* pCam)
 {
-
+	if (doOnce == false) {
+		chk.TraverseSVO(pCam->GetPosition(), 20);
+		doOnce = true;
+	}
 	//std::vector < glm::vec3 > vertexBuff;
 	//std::vector < int > indexBuff;
 	//

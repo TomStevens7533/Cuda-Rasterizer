@@ -22,6 +22,7 @@ public:
 
 	void CalculateInverseONB();
 
+	glm::vec3 GetPosition();
 private:
 	void RotateYaw(float angleRadians);
 	void RotatePitch(float angleRadians);
@@ -34,7 +35,7 @@ private:
 	float m_FarPlane = 1000000.f;
 	float m_NearPlane = 0.01f;
 
-	glm::vec3 m_Position{0,-150,-50 };
+	glm::vec3 m_Position{0,150,50 };
 	glm::quat m_CameraQuaternion{};
 
 	glm::quat m_CameraQuaternionYaw{};

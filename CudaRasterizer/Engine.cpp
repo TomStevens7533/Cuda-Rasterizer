@@ -72,7 +72,7 @@ void Engine::mainLoop()
 		Renderer::BeginScene(scData);
 		
 		//Update application
-		m_Application.Update();
+		m_Application.Update(&m_Camera);
 
 		//End Scene
 		cudaGraphicsUnmapResources(1, &m_cudaGraphicsResource);

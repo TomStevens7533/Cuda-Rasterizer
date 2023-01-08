@@ -47,6 +47,12 @@ void Camera::CalculateInverseONB()
 	m_ViewProjMatrix = ((flipMatrix * m_Proj) * m_View);
 
 }
+
+glm::vec3 Camera::GetPosition()
+{
+	return m_Position;
+}
+
 void Camera::CalculateProjectionMatrix(float fov, float aspectRatio)
 {
 	m_Proj = glm::perspective(glm::radians(fov), aspectRatio, m_NearPlane, m_FarPlane);
@@ -82,37 +88,37 @@ void Camera::UpdateCamera()
 	if (Input::IsKeyPressed(KEY_LEFT_ALT))
 		multiplier++;
 	if (Input::IsKeyPressed(KEY_D)) {
-		newPos -= rightVec * (m_CameraMovementSpeed * multiplier * timeInstance->GetDeltaTime());
+		newPos += rightVec * (m_CameraMovementSpeed * multiplier * timeInstance->GetDeltaTime());
 		//EU_CORE_INFO("NEW POS: X {0}, Y {1}, Z {2}", newPos.x, newPos.y, newPos.z);
 		m_UpdateNeeded = true;
 	}
 	if (Input::IsKeyPressed(KEY_A)) {
-		newPos += rightVec * ((m_CameraMovementSpeed * multiplier * timeInstance->GetDeltaTime()));
+		newPos -= rightVec * ((m_CameraMovementSpeed * multiplier * timeInstance->GetDeltaTime()));
 		//EU_CORE_INFO("NEW POS: X {0}, Y {1}, Z {2}", newPos.x, newPos.y, newPos.z);
 
 		m_UpdateNeeded = true;
 	}
 	if (Input::IsKeyPressed(KEY_W)) {
-		newPos += forwardVec * ((m_CameraMovementSpeed * multiplier * timeInstance->GetDeltaTime()));
+		newPos -= forwardVec * ((m_CameraMovementSpeed * multiplier * timeInstance->GetDeltaTime()));
 		//EU_CORE_INFO("NEW POS: X {0}, Y {1}, Z {2}", newPos.x, newPos.y, newPos.z);
 
 		m_UpdateNeeded = true;
 	}
 
 	if (Input::IsKeyPressed(KEY_S)) {
-		newPos -= forwardVec * ((m_CameraMovementSpeed * multiplier * timeInstance->GetDeltaTime()));
+		newPos += forwardVec * ((m_CameraMovementSpeed * multiplier * timeInstance->GetDeltaTime()));
 		//EU_CORE_INFO("NEW POS: X {0}, Y {1}, Z {2}", newPos.x, newPos.y, newPos.z);
 
 		m_UpdateNeeded = true;
 	}
 	if (Input::IsKeyPressed(KEY_C)) {
-		newPos += upVec * ((m_CameraMovementSpeed * multiplier * timeInstance->GetDeltaTime()));
+		newPos -= upVec * ((m_CameraMovementSpeed * multiplier * timeInstance->GetDeltaTime()));
 		//EU_CORE_INFO("NEW POS: X {0}, Y {1}, Z {2}", newPos.x, newPos.y, newPos.z);
 
 		m_UpdateNeeded = true;
 	}
 	if (Input::IsKeyPressed(KEY_SPACE)) {
-		newPos -= upVec * ((m_CameraMovementSpeed * multiplier * timeInstance->GetDeltaTime()));
+		newPos += upVec * ((m_CameraMovementSpeed * multiplier * timeInstance->GetDeltaTime()));
 		//EU_CORE_INFO("NEW POS: X {0}, Y {1}, Z {2}", newPos.x, newPos.y, newPos.z);
 
 		m_UpdateNeeded = true;
@@ -159,7 +165,7 @@ void Camera::UpdateCamera()
 
 	if (m_UpdateNeeded) {
 
-		auto worldPos = m_Position;
+		auto worldPos = -m_Position;
 		auto look = getForward();
 		//std::cout << worldPos.x << " " << worldPos.y << " " << worldPos.z << std::endl;
 
