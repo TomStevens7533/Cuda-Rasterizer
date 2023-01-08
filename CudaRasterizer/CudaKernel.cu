@@ -343,19 +343,19 @@ void RasterizePixels(int pixelXoffset, int pixelYoffset, int numpixelsX, int num
                
                 float totalWeight = weights[0] + weights[1] + weights[2];
 
-                float ZBufferValue = 1 / (((1 / currentTriangle.NDC[0].z) * weights[1]) + ((1 / currentTriangle.NDC[1].z) * weights[2])
-                    + ((1 / currentTriangle.NDC[2].z) * weights[0]));
+                float ZBufferValue = 1 / (((1 / currentTriangle.NDC[0].z) * weights[0]) + ((1 / currentTriangle.NDC[1].z) * weights[1])
+                    + ((1 / currentTriangle.NDC[2].z) * weights[2]));
 
-                float interpolatedW = 1 / (((1 / currentTriangle.NDC[0].w) * weights[1]) + ((1 / currentTriangle.NDC[1].w) * weights[2])
-                    + ((1 / currentTriangle.NDC[2].w) * weights[0]));
+                float interpolatedW = 1 / (((1 / currentTriangle.NDC[0].w) * weights[0]) + ((1 / currentTriangle.NDC[1].w) * weights[1])
+                    + ((1 / currentTriangle.NDC[2].w) * weights[2]));
 
 
                 if (ZBufferValue > 0 && ZBufferValue < 1) { //Depth test | is interpolated value inside [0,1] range
                     fragment previousDepth = dev_depthBuffer[index];
-                    if (interpolatedW < previousDepth.depth) {
+                    if (ZBufferValue < previousDepth.depth) {
                         fragment frag;
                         frag.color = PixelShading(glm::vec2{ _x, _y }, &currentTriangle);
-                        frag.depth = interpolatedW;
+                        frag.depth = ZBufferValue;
                         dev_depthBuffer[index] = frag;
 
                     }
@@ -386,7 +386,6 @@ void RasterizeTiles(Input_Triangle* primitives, int triangleSize, glm::vec2 reso
 
     dim3 blockCount1d_triangles(((triangleSize - 1) / numThreadsPerBlock.x) + 1);
     SortTrianglesInCorrectTile << <blockCount1d_triangles, numThreadsPerBlock >> > (primitives, triangleSize, resolution, stride_x, stride_y, dev_mutex, tileBuffer);
-    cudaDeviceSynchronize();
     checkCUDAError("Sort triangles failed");
 
 
