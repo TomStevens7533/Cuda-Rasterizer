@@ -30,6 +30,7 @@ private:
 	void deletePBO(GLuint* pbo);
 	void compileShader(const char* shaderName, const char* shaderSource, GLenum shaderType, GLint& shaders);
 private:
+	Camera m_Camera;
 
 
 	//-------------------------------
@@ -50,7 +51,6 @@ private:
 	cudaArray* m_cudaArray;
 	cudaTextureObject_t m_texture;
 
-	Camera m_Camera;
 	Application m_Application;
 
 };

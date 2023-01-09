@@ -6,7 +6,7 @@ struct GLFWwindow;
 class Camera;
 class Application final {
 public:
-	Application(int width, int height);
+	Application(int width, int height, Camera* pCam);
 	~Application();
 
 	inline static Application& Get() { return *s_Instance; }

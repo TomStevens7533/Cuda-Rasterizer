@@ -2,6 +2,8 @@
 #include <array>
 #include <iostream>
 #include <cmath>
+#include <gtc/integer.hpp>
+
 const std::array<float, 12> xFace2{
 	0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1,
 };
@@ -28,27 +30,65 @@ const std::array<float, 12> bottomFace{
 	0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1
 };
 
-ChunkMesh::ChunkMesh()
+ChunkMesh::ChunkMesh(glm::vec3 originPos, float lodDistance) 
+	: m_ThreadOriginPos{originPos}, m_ThreadLODdistance{lodDistance}
 {
 	m_StarterNode = new SVOInnerNode();
 	m_StarterNode->pParentNode = nullptr;
 	FillSVO();
+	m_LODUpdatingThread = std::jthread{ &ChunkMesh::TraverseSVO, this };
 }
 
 ChunkMesh::~ChunkMesh()
 {
+	m_IsThreadRunning = false;
+	while (m_SwapDone == false)
+	{
+
+	}
 	if (m_StarterNode != nullptr) {
 		delete m_StarterNode;
 	}
 }
 
-void ChunkMesh::TraverseSVO(glm::vec3 originPos, float lodDistance)
+void ChunkMesh::TraverseSVO()
 {
-	m_Vertices.clear();
-	m_Indices.clear();
-	TraverseSVONode(m_StarterNode, CHUNKSIZE_X / 2, glm::vec3{CHUNKSIZE_X / 2, CHUNKSIZE_X / 2 , CHUNKSIZE_X /2 }, originPos, lodDistance);
-	std::cout << "Amount of block filled: " << m_blockdetected << std::endl;
+	while (m_IsThreadRunning)
+	{
+		if (m_SwapDone == false) {
+			std::cout << "Starting vertex/index creatiom" << std::endl;
 
+			TraverseSVONode(m_StarterNode, CHUNKSIZE_X / 2, glm::vec3{ CHUNKSIZE_X / 2, CHUNKSIZE_X / 2 , CHUNKSIZE_X / 2 },
+				m_ThreadOriginPos, m_ThreadLODdistance);
+
+			std::cout << "Amount of block filled: " << m_blockdetected << std::endl;
+			m_SwapDone = true;
+			m_blockdetected = 0;
+		}
+	}
+
+}
+void ChunkMesh::SwapBuffers(glm::vec3 originPos, float lodDistance)
+{
+	if (m_SwapDone) {
+		//Swap Buffers
+		m_Vertices.clear();
+		m_Indices.clear();
+		m_IndicesIndex = 0;
+		m_Facedetected = 0;
+
+		m_Vertices = (m_ThreadVertices);
+		m_Indices = (m_ThreadIndices);
+
+		m_ThreadIndices.clear();
+		m_ThreadVertices.clear();
+
+		m_ThreadOriginPos = originPos;
+		m_ThreadLODdistance = lodDistance;
+		m_SwapDone = false;
+
+
+	}
 }
 void ChunkMesh::TraverseSVONode(SVOBaseNode* pNode, int resolution, glm::vec3 nodeLocalPosition,
 	glm::vec3 originPos, float lodDistance)
@@ -90,7 +130,45 @@ void ChunkMesh::TraverseSVONode(SVOBaseNode* pNode, int resolution, glm::vec3 no
 					newNodePosition.x += (x == 0 ? -1 : 1) * newChildResolution;
 					newNodePosition.y += (y == 0 ? -1 : 1) * newChildResolution;
 					newNodePosition.z += (z == 0 ? -1 : 1) * newChildResolution;
-					TraverseSVONode(innerNode->children[x][y][z], newChildResolution, newNodePosition, originPos, lodDistance);
+
+					float distanceToCam = glm::distance(newNodePosition, originPos);
+					int resolutionLODlevel = glm::log2(newChildResolution);
+					int distanceLODLevel = (distanceToCam / lodDistance);
+
+			
+
+
+					if (distanceLODLevel > MAX_LEVEL && resolutionLODlevel == (distanceLODLevel - MAX_LEVEL)) {
+
+						//DRAW LOD LEVEL
+						std::pair<bool, bool> blockPair;
+						blockPair.first = false;
+						blockPair.second = false;
+						HasMultipleBlocks(innerNode->children[x][y][z], blockPair);
+						if (blockPair.first && blockPair.second) {
+							//Has multiple blocktypes RENDER
+							glm::vec3 nodePos = newNodePosition;
+
+							nodePos.x -= newChildResolution;
+							nodePos.y -= newChildResolution;
+							nodePos.z -= newChildResolution;
+							GenerateFace(Faces::BACK,	nodePos, resolution);
+							GenerateFace(Faces::BOT,	nodePos, resolution);
+							GenerateFace(Faces::FRONT,	nodePos, resolution);
+							GenerateFace(Faces::LEFT,	nodePos, resolution);
+							GenerateFace(Faces::RIGHT,  nodePos, resolution);
+							GenerateFace(Faces::TOP,	nodePos, resolution);
+
+
+
+						}
+						//std::cout << "DRAWING LOD LEVEL: " << resolutionLODlevel << std::endl;
+					}
+					else {
+						TraverseSVONode(innerNode->children[x][y][z], newChildResolution, newNodePosition, originPos, lodDistance);
+					}
+					
+
 
 				}
 			}
@@ -115,7 +193,6 @@ void ChunkMesh::TraverseSVONode(SVOBaseNode* pNode, int resolution, glm::vec3 no
 
 	}
 	
-
 }
 void ChunkMesh::CheckGenerationOfFace(Faces dir, SVOLeafNode* currLeafnode, glm::vec3 nodePos)
 {
@@ -311,6 +388,42 @@ void ChunkMesh::CheckGenerationOfFace(Faces dir, SVOLeafNode* currLeafnode, glm:
 		return;
 	}
 }
+
+void ChunkMesh::HasMultipleBlocks(SVOBaseNode* node, std::pair<bool, bool>& output)
+{
+	bool hasAir = false;
+	bool hasBlock = false;
+
+	if (node->m_IsEndNode)
+		return;
+
+	if (!dynamic_cast<SVOLeafNode*>(node)) {
+		for (size_t x = 0; x < 2; x++)
+		{
+			for (size_t y = 0; y < 2; y++)
+			{
+				for (size_t z = 0; z < 2; z++)
+				{
+					SVOInnerNode* childNode = static_cast<SVOInnerNode*>(node);
+					SVOBaseNode* pBaseNode = childNode->children[x][y][z];
+					HasMultipleBlocks(pBaseNode, output);
+				}
+
+				
+			}
+		}
+	}
+	else {
+		SVOLeafNode* leafnode = static_cast<SVOLeafNode*>(node);
+		if (leafnode->blockID == AIR)
+			output.first = true;
+		else
+			output.second = true;
+	}
+}
+
+
+
 ////void CheckGenerationOfFace1(Faces dir, SVOLeafNode* currLeafnode)
 //{
 //	SVOInnerNode* pParentNode = currLeafnode->pParentNode;
@@ -410,8 +523,11 @@ std::vector<int>& ChunkMesh::GetIndices()
 	return m_Indices;
 }
 
+
+
 void ChunkMesh::FillSVO()
 {
+
 	//Fill starter node
 	FillSVONode(m_StarterNode, MAX_DEPTH, 0, 0, 0, CHUNKSIZE_X);
 	std::cout << "Amount of block filled: " << m_blockdetected << std::endl;
@@ -508,7 +624,7 @@ BlockTypes ChunkMesh::GetTerrainData(glm::vec3 position)
 		return BlockTypes::BLOCK;
 
 }
-void ChunkMesh::GenerateFace(Faces dir, glm::vec3 position)
+void ChunkMesh::GenerateFace(Faces dir, glm::vec3 position, int scale)
 {
 	const std::array<float, 12>* blockFace;
 	std::vector<int> indices;
@@ -540,14 +656,15 @@ void ChunkMesh::GenerateFace(Faces dir, glm::vec3 position)
 
 	for (size_t i = 0; i < blockFace->size(); i += 3)
 	{
-		glm::vec3 Vertex1Pos = glm::vec3{ position.x + (*blockFace)[i], position.y + (*blockFace)[i + 1],position.z + (*blockFace)[i + 2] };
+		glm::vec3 Vertex1Pos = glm::vec3{ position.x + ((*blockFace)[i] * scale), position.y + ((*blockFace)[i + 1] * scale),
+			position.z + ((*blockFace)[i + 2]* scale) };
 		vertices.push_back(Vertex1Pos);
 	}
 
 	indices = { m_IndicesIndex, m_IndicesIndex + 1, m_IndicesIndex + 2, m_IndicesIndex + 2, m_IndicesIndex + 3, m_IndicesIndex };
 	m_IndicesIndex += 4;
-	m_Indices.insert(m_Indices.end(), indices.begin(), indices.end());
-	m_Vertices.insert(m_Vertices.end(), vertices.begin(), vertices.end());
+	m_ThreadIndices.insert(m_ThreadIndices.end(), indices.begin(), indices.end());
+	m_ThreadVertices.insert(m_ThreadVertices.end(), vertices.begin(), vertices.end());
 
 	m_Facedetected++;
 }

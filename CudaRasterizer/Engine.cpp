@@ -3,7 +3,7 @@
 #include "DeltaTime.h"
 
 
-Engine::Engine() : m_Application{width, height}, m_Camera{90}
+Engine::Engine() : m_Camera{ 90 },m_Application{width, height, &m_Camera}
 {
 
 }

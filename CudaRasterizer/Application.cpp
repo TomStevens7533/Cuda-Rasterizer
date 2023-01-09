@@ -11,7 +11,8 @@
 
 Application* Application::s_Instance = nullptr;
 
-Application::Application(int width, int height) : m_Window{width, height}
+Application::Application(int width, int height, Camera* pCam) : m_Window{width, height},
+chk{ pCam->GetPosition(), 40 }
 {
 	s_Instance = this;
 	m_Window.InitWindow();
@@ -34,10 +35,10 @@ void Application::Start()
 
 void Application::Update(Camera* pCam)
 {
-	if (doOnce == false) {
-		chk.TraverseSVO(pCam->GetPosition(), 20);
-		doOnce = true;
-	}
+	chk.SwapBuffers(pCam->GetPosition(), 40);
+	//Set on seperate thread
+	//chk.TraverseSVO(pCam->GetPosition(), 20);
+
 	//std::vector < glm::vec3 > vertexBuff;
 	//std::vector < int > indexBuff;
 	//

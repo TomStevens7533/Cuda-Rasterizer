@@ -160,7 +160,7 @@ __host__ __device__ void getAABBForTriangle(Input_Triangle tri, glm::vec3& minpo
 }
 __global__ void SortTrianglesInCorrectTile(Input_Triangle* primitives, int triangleSize, glm::vec2 resolution, int strideX, int strideY, int* dev_tilemutex, Tile* dev_tilebuffer) {
     int triangleIndex = (blockIdx.x * blockDim.x) + threadIdx.x;
-    if (triangleIndex < triangleSize) {
+    if (triangleIndex < triangleSize && triangleIndex >= 0) {
         Input_Triangle input = primitives[triangleIndex];
             AABB boundingBox = getBBForTriangle(input);
 
@@ -386,6 +386,7 @@ void RasterizeTiles(Input_Triangle* primitives, int triangleSize, glm::vec2 reso
 
     dim3 blockCount1d_triangles(((triangleSize - 1) / numThreadsPerBlock.x) + 1);
     SortTrianglesInCorrectTile << <blockCount1d_triangles, numThreadsPerBlock >> > (primitives, triangleSize, resolution, stride_x, stride_y, dev_mutex, tileBuffer);
+    cudaDeviceSynchronize();
     checkCUDAError("Sort triangles failed");
 
 
@@ -681,7 +682,8 @@ void cudaRasterizeCore(uchar4* PBOpos, glm::vec2 resolution, const glm::vec3* pV
     dev_pTriangleBuffer = NULL;
     cudaError err = cudaMalloc((void**)&dev_pTriangleBuffer, m_CurrentBufferPrimitiveAmount * sizeof(Input_Triangle));
     checkCUDAError("Allocating triangle data failed!");
-
+    if (m_CurrentBufferPrimitiveAmount <= 0)
+        return;
 
 
     // set up thread configuration
