@@ -12,7 +12,7 @@
 Application* Application::s_Instance = nullptr;
 
 Application::Application(int width, int height, Camera* pCam) : m_Window{width, height},
-chk{ pCam->GetPosition(), 40 }
+chk{ pCam->GetPosition(), 100 }
 {
 	s_Instance = this;
 	m_Window.InitWindow();

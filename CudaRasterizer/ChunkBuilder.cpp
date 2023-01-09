@@ -118,7 +118,6 @@ void ChunkMesh::TraverseSVONode(SVOBaseNode* pNode, int resolution, glm::vec3 no
 	}
 	SVOInnerNode* innerNode = static_cast<SVOInnerNode*>(pNode);
 
-	if (resolution > 1) {
 		int newChildResolution = resolution * 0.5f;
 		for (size_t x = 0; x < 2; x++)
 		{
@@ -127,71 +126,76 @@ void ChunkMesh::TraverseSVONode(SVOBaseNode* pNode, int resolution, glm::vec3 no
 				for (size_t z = 0; z < 2; z++)
 				{
 					glm::vec3 newNodePosition = nodeLocalPosition;
-					newNodePosition.x += (x == 0 ? -1 : 1) * newChildResolution;
-					newNodePosition.y += (y == 0 ? -1 : 1) * newChildResolution;
-					newNodePosition.z += (z == 0 ? -1 : 1) * newChildResolution;
+					if (resolution > 1) {
+						newNodePosition.x += (x == 0 ? -1 : 1) * newChildResolution;
+						newNodePosition.y += (y == 0 ? -1 : 1) * newChildResolution;
+						newNodePosition.z += (z == 0 ? -1 : 1) * newChildResolution;
+					}
+					else {
+						newNodePosition.x += (x == 0 ? -1 : 0);
+						newNodePosition.y += (y == 0 ? -1 : 0);
+						newNodePosition.z += (z == 0 ? -1 : 0);
+					}
+			
 
 					float distanceToCam = glm::distance(newNodePosition, originPos);
 					int resolutionLODlevel = glm::log2(newChildResolution);
 					int distanceLODLevel = (distanceToCam / lodDistance);
-
+					int clampedDistanceLodLevel = glm::clamp(distanceLODLevel, 1, MAX_LEVEL);
 			
 
 
-					if (distanceLODLevel > MAX_LEVEL && resolutionLODlevel == (distanceLODLevel - MAX_LEVEL)) {
+					if (resolutionLODlevel <= MAX_LEVEL && resolutionLODlevel == clampedDistanceLodLevel && distanceLODLevel >= 1)
+					{
 
 						//DRAW LOD LEVEL
 						std::pair<bool, bool> blockPair;
 						blockPair.first = false;
 						blockPair.second = false;
 						HasMultipleBlocks(innerNode->children[x][y][z], blockPair);
-						if (blockPair.first && blockPair.second) {
+						if (blockPair.first == true && blockPair.second == true) {
 							//Has multiple blocktypes RENDER
 							glm::vec3 nodePos = newNodePosition;
 
-							nodePos.x -= newChildResolution;
+
+							nodePos.x += newChildResolution;
 							nodePos.y -= newChildResolution;
 							nodePos.z -= newChildResolution;
-							GenerateFace(Faces::BACK,	nodePos, resolution);
-							GenerateFace(Faces::BOT,	nodePos, resolution);
-							GenerateFace(Faces::FRONT,	nodePos, resolution);
-							GenerateFace(Faces::LEFT,	nodePos, resolution);
-							GenerateFace(Faces::RIGHT,  nodePos, resolution);
-							GenerateFace(Faces::TOP,	nodePos, resolution);
+
+							GenerateFace(Faces::BACK, nodePos,  resolution);
+							GenerateFace(Faces::BOT, nodePos,	resolution);
+							GenerateFace(Faces::FRONT, nodePos, resolution);
+							GenerateFace(Faces::LEFT, nodePos,  resolution);
+							GenerateFace(Faces::RIGHT, nodePos, resolution);
+							GenerateFace(Faces::TOP, nodePos,   resolution);
+
+							for (size_t x = 0; x < 2; x++)
+							{
+								for (size_t y = 0; y < 2; y++)
+								{
+									for (size_t z = 0; z < 2; z++)
+									{
+
+									}
+								}
+							}
 
 
-
+							continue;
 						}
+						
+						TraverseSVONode(innerNode->children[x][y][z], newChildResolution, newNodePosition, originPos, lodDistance);
 						//std::cout << "DRAWING LOD LEVEL: " << resolutionLODlevel << std::endl;
 					}
-					else {
+					else
 						TraverseSVONode(innerNode->children[x][y][z], newChildResolution, newNodePosition, originPos, lodDistance);
-					}
+					
 					
 
 
 				}
 			}
 		}
-	}
-	else {
-		for (size_t x = 0; x < 2; x++)
-		{
-			for (size_t y = 0; y < 2; y++)
-			{
-				for (size_t z = 0; z < 2; z++)
-				{
-					glm::vec3 newNodePosition = nodeLocalPosition;
-					newNodePosition.x += (x == 0 ? -1 : 0);
-					newNodePosition.y += (y == 0 ? -1 : 0);
-					newNodePosition.z += (z == 0 ? -1 : 0);
-					TraverseSVONode(innerNode->children[x][y][z], 0, newNodePosition, originPos, lodDistance);
-
-				}
-			}
-		}
-
-	}
 	
 }
 void ChunkMesh::CheckGenerationOfFace(Faces dir, SVOLeafNode* currLeafnode, glm::vec3 nodePos)

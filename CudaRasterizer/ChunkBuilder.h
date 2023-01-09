@@ -15,7 +15,7 @@
 
 #define  MAX_DEPTH 8
 #define MAKE_SPARSE
-#define  MAX_LEVEL 2
+#define  MAX_LEVEL 4
 enum class Faces
 {
 	//Positive
