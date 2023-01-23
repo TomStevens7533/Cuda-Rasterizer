@@ -368,6 +368,7 @@ void RasterizePixels(int pixelXoffset, int pixelYoffset, int numpixelsX, int num
         }
     }
 }
+//https://github.com/AmanSachan1/CUDA-Rasterizer
 void RasterizeTiles(Input_Triangle* primitives, int triangleSize, glm::vec2 resolution, fragment* depthBuffer, int* dev_mutex) {
 
     cudaDeviceSynchronize();

@@ -6,16 +6,16 @@
 #include "Content/PerlinNoise.hpp"
 #include <thread>
 
-#define  CHUNKSIZE_X (512)
-#define  CHUNKSIZE_Z (512)
-#define  CHUNKSIZE_Y (512)
-#define  CHUNKSIZE_Y_MAX_TERRAIN 767
-#define  CHUNKSIZE_Y_MIN_TERRAIN 667
+#define  CHUNKSIZE_X (256)
+#define  CHUNKSIZE_Z (256)
+#define  CHUNKSIZE_Y (256)
+#define  CHUNKSIZE_Y_MAX_TERRAIN 255
+#define  CHUNKSIZE_Y_MIN_TERRAIN 100
 
 
 #define  MAX_DEPTH 8
-//#define MAKE_SPARSE
-//#define  USE_LOD
+#define MAKE_SPARSE
+#define  USE_LOD
 #define  MAX_LEVEL 4
 #define TEST_TRAVERSAL_TIMING
 //#define TEST_GENERATING_FACES_TIMING

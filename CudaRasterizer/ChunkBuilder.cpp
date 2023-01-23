@@ -36,7 +36,7 @@ ChunkMesh::ChunkMesh(glm::vec3 originPos, float lodDistance)
 	m_StarterNode = new SVOInnerNode();
 	m_StarterNode->pParentNode = nullptr;
 	FillSVO();
-	//m_LODUpdatingThread = std::jthread{ &ChunkMesh::TraverseSVO, this };
+	m_LODUpdatingThread = std::jthread{ &ChunkMesh::TraverseSVO, this };
 #ifdef TEST_TRAVERSAL_TIMING
 	auto duration = 0.f;
 
@@ -98,12 +98,12 @@ void ChunkMesh::TraverseSVO()
 	while (m_IsThreadRunning)
 	{
 		if (m_SwapDone == false) {
-			//std::cout << "Starting vertex/index creatiom" << std::endl;
+			std::cout << "Starting vertex/index creatiom" << std::endl;
 
 			TraverseSVONode(m_StarterNode, CHUNKSIZE_X / 2, glm::vec3{ CHUNKSIZE_X / 2, CHUNKSIZE_X / 2 , CHUNKSIZE_X / 2 },
 				m_ThreadOriginPos, m_ThreadLODdistance);
 
-			//std::cout << "Amount of block filled: " << m_blockdetected << std::endl;
+			std::cout << "Amount of block filled: " << m_blockdetected << std::endl;
 			m_SwapDone = true;
 			m_blockdetected = 0;
 		}

@@ -35,7 +35,7 @@ void Application::Start()
 
 void Application::Update(Camera* pCam)
 {
-	chk.SwapBuffers(pCam->GetPosition(), 40);
+	chk.SwapBuffers(pCam->GetPosition(), 150);
 	//Set on seperate thread
 	//chk.TraverseSVO(pCam->GetPosition(), 20);
 
