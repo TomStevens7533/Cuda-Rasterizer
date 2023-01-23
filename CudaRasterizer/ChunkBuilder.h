@@ -6,16 +6,20 @@
 #include "Content/PerlinNoise.hpp"
 #include <thread>
 
-#define  CHUNKSIZE_X 256
-#define  CHUNKSIZE_Z 256
-#define  CHUNKSIZE_Y 256
-#define  CHUNKSIZE_Y_MAX_TERRAIN 255
-#define  CHUNKSIZE_Y_MIN_TERRAIN 150
+#define  CHUNKSIZE_X (512)
+#define  CHUNKSIZE_Z (512)
+#define  CHUNKSIZE_Y (512)
+#define  CHUNKSIZE_Y_MAX_TERRAIN 767
+#define  CHUNKSIZE_Y_MIN_TERRAIN 667
 
 
 #define  MAX_DEPTH 8
-#define MAKE_SPARSE
+//#define MAKE_SPARSE
+//#define  USE_LOD
 #define  MAX_LEVEL 4
+#define TEST_TRAVERSAL_TIMING
+//#define TEST_GENERATING_FACES_TIMING
+
 enum class Faces
 {
 	//Positive
@@ -54,7 +58,7 @@ public:
 	std::vector<glm::vec3>& GetVertices();
 	std::vector<int>& GetIndices();
 	void SwapBuffers(glm::vec3 originPos, float lodDistance);
-
+	BlockTypes FindBlockAtID(glm::vec3 octreeID);
 private:
 	void FillSVO();
 	void FillSVONode(SVOBaseNode* childToFill, int depth,

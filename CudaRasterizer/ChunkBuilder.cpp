@@ -36,7 +36,49 @@ ChunkMesh::ChunkMesh(glm::vec3 originPos, float lodDistance)
 	m_StarterNode = new SVOInnerNode();
 	m_StarterNode->pParentNode = nullptr;
 	FillSVO();
-	m_LODUpdatingThread = std::jthread{ &ChunkMesh::TraverseSVO, this };
+	//m_LODUpdatingThread = std::jthread{ &ChunkMesh::TraverseSVO, this };
+#ifdef TEST_TRAVERSAL_TIMING
+	auto duration = 0.f;
+
+	for (size_t i = 0; i < 10000; i++)
+	{
+		glm::vec3 testPos = { rand() % CHUNKSIZE_X ,rand() % CHUNKSIZE_X,rand() % CHUNKSIZE_X };
+		/*std::cout << "BLOCK ID:" << FindBlockAtID(testPos) << " | AT POS : "
+			<< testPos.x << "," << testPos.y << "," << testPos.z << std::endl;*/
+		auto start = std::chrono::high_resolution_clock::now();
+		FindBlockAtID(testPos);
+		auto stop = std::chrono::high_resolution_clock::now();
+		duration += duration_cast<std::chrono::nanoseconds>(stop - start).count();
+	}
+
+
+
+	std::cout << duration / 10000.f << std::endl;
+#endif
+#ifdef TEST_GENERATING_FACES_TIMING
+	auto duration = 0.f;
+
+	for (size_t i = 0; i < 10; i++)
+	{
+		auto start = std::chrono::high_resolution_clock::now();
+
+		TraverseSVONode(m_StarterNode, CHUNKSIZE_X / 2,
+			glm::vec3{ CHUNKSIZE_X / 2, CHUNKSIZE_X / 2 , CHUNKSIZE_X / 2 },
+			m_ThreadOriginPos, m_ThreadLODdistance);
+
+
+		auto stop = std::chrono::high_resolution_clock::now();
+
+		m_ThreadIndices.clear();
+		m_ThreadVertices.clear();
+		m_Vertices.clear();
+		m_Indices.clear();
+		m_IndicesIndex = 0;
+		m_Facedetected = 0;
+		duration += duration_cast<std::chrono::milliseconds>(stop - start).count();
+	}
+	std::cout << duration / 10.f << std::endl;
+#endif
 }
 
 ChunkMesh::~ChunkMesh()
@@ -56,12 +98,12 @@ void ChunkMesh::TraverseSVO()
 	while (m_IsThreadRunning)
 	{
 		if (m_SwapDone == false) {
-			std::cout << "Starting vertex/index creatiom" << std::endl;
+			//std::cout << "Starting vertex/index creatiom" << std::endl;
 
 			TraverseSVONode(m_StarterNode, CHUNKSIZE_X / 2, glm::vec3{ CHUNKSIZE_X / 2, CHUNKSIZE_X / 2 , CHUNKSIZE_X / 2 },
 				m_ThreadOriginPos, m_ThreadLODdistance);
 
-			std::cout << "Amount of block filled: " << m_blockdetected << std::endl;
+			//std::cout << "Amount of block filled: " << m_blockdetected << std::endl;
 			m_SwapDone = true;
 			m_blockdetected = 0;
 		}
@@ -90,6 +132,50 @@ void ChunkMesh::SwapBuffers(glm::vec3 originPos, float lodDistance)
 
 	}
 }
+
+BlockTypes ChunkMesh::FindBlockAtID(glm::vec3 octreeID)
+{
+	SVOBaseNode* pNewBase = m_StarterNode;
+
+	//Save local octree sector position
+	int localSectorOffset[3]{ 0,0,0 };
+	int resolution = CHUNKSIZE_X;
+	int ParentLookupID3D[3]{};
+	do
+	{
+		glm::vec3 checkposVec = octreeID;
+
+		if (pNewBase->m_IsEndNode)
+			return AIR; //If sparse return air
+
+		for (size_t i = 0; i < 3; i++)
+		{
+			//Get axis position
+			int position = (int)checkposVec[i];
+
+			//Check in which ID postion ios located
+			if (position < (resolution / 2) + localSectorOffset[i]) {
+				ParentLookupID3D[i] = 0;
+			}
+			else
+				ParentLookupID3D[i] = 1;
+
+			//Save current sector offset
+			localSectorOffset[i] += (resolution / 2) * ParentLookupID3D[i];
+		}
+		//Get octree child
+		pNewBase = (static_cast<SVOInnerNode*>(pNewBase)->children[ParentLookupID3D[0]]
+			[ParentLookupID3D[1]]
+		[ParentLookupID3D[2]]);
+
+		//Reduce resolution
+		resolution *= 0.5f;
+		//Untill we have found a leafnode
+	} while (!(dynamic_cast<SVOLeafNode*>(pNewBase)));
+	SVOLeafNode* leafNode = (static_cast<SVOLeafNode*>(pNewBase));
+	return leafNode->blockID;
+}
+
 void ChunkMesh::TraverseSVONode(SVOBaseNode* pNode, int resolution, glm::vec3 nodeLocalPosition,
 	glm::vec3 originPos, float lodDistance)
 {
@@ -145,6 +231,7 @@ void ChunkMesh::TraverseSVONode(SVOBaseNode* pNode, int resolution, glm::vec3 no
 			
 
 
+
 					if (resolutionLODlevel <= MAX_LEVEL && resolutionLODlevel == clampedDistanceLodLevel && distanceLODLevel >= 1)
 					{
 
@@ -162,23 +249,12 @@ void ChunkMesh::TraverseSVONode(SVOBaseNode* pNode, int resolution, glm::vec3 no
 							nodePos.y -= newChildResolution;
 							nodePos.z -= newChildResolution;
 
-							GenerateFace(Faces::BACK, nodePos,  resolution);
-							GenerateFace(Faces::BOT, nodePos,	resolution);
+							GenerateFace(Faces::BACK, nodePos, resolution);
+							GenerateFace(Faces::BOT, nodePos, resolution);
 							GenerateFace(Faces::FRONT, nodePos, resolution);
-							GenerateFace(Faces::LEFT, nodePos,  resolution);
+							GenerateFace(Faces::LEFT, nodePos, resolution);
 							GenerateFace(Faces::RIGHT, nodePos, resolution);
-							GenerateFace(Faces::TOP, nodePos,   resolution);
-
-							for (size_t x = 0; x < 2; x++)
-							{
-								for (size_t y = 0; y < 2; y++)
-								{
-									for (size_t z = 0; z < 2; z++)
-									{
-
-									}
-								}
-							}
+							GenerateFace(Faces::TOP, nodePos, resolution);
 
 
 							continue;
